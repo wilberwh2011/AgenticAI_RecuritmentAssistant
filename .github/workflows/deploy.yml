@@ -3,10 +3,10 @@ name: Build and Deploy to Cloud Run
 on:
   push:
     branches:
-      - main          # Auto-deploy on push to main
+      - main
   pull_request:
     branches:
-      - main          # Run build+test on PRs (no deploy)
+      - main
 
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
@@ -16,11 +16,9 @@ env:
   SERVICE: ai-app
 
 jobs:
-  # ── Job 1: Test ─────────────────────────────────────────────────────────
   test:
     name: Run Tests
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -34,23 +32,17 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run tests
-        run: |
-          # If you have pytest tests:
-          # pytest tests/ -v
-          # For now, at minimum verify the app can be imported:
-          python -c "from main import app; print('App import OK')"
+        run: python -c "from main import app; print('App import OK')"
         env:
-          # Set dummy env vars so imports don't fail
           GOOGLE_CLOUD_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
           GOOGLE_CLOUD_REGION: us-central1
           CHROMA_DB_DIR: /tmp/chroma
 
-  # ── Job 2: Build & Deploy (only on push to main) ─────────────────────────
   deploy:
     name: Build and Deploy
-    needs: test                         # Only runs if tests pass
+    needs: test
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' # Not on PRs
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
       - name: Checkout code
@@ -60,13 +52,6 @@ jobs:
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
-          export_default_credentials: true
-
-      - name: Debug auth
-        run: |
-          gcloud auth list
-          gcloud config list
-    
 
       - name: Set up gcloud CLI
         uses: google-github-actions/setup-gcloud@v2
@@ -74,12 +59,13 @@ jobs:
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
 
-      - name: Build and push image via Cloud Build
+      - name: Build Docker image locally
         run: |
-          gcloud builds submit \
-            --tag ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:${{ github.sha }} \
-            --project ${{ env.PROJECT_ID }}
-            --suppress-logs
+          docker build -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:${{ github.sha }} .
+
+      - name: Push image to Artifact Registry
+        run: |
+          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:${{ github.sha }}
 
       - name: Deploy to Cloud Run
         run: |
