@@ -3,10 +3,10 @@ name: Build and Deploy to Cloud Run
 on:
   push:
     branches:
-      - main
+      - main          # Auto-deploy on push to main
   pull_request:
     branches:
-      - main
+      - main          # Run build+test on PRs (no deploy)
 
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
@@ -35,20 +35,22 @@ jobs:
 
       - name: Run tests
         run: |
-          # Replace with pytest when ready:
+          # If you have pytest tests:
           # pytest tests/ -v
+          # For now, at minimum verify the app can be imported:
           python -c "from main import app; print('App import OK')"
         env:
+          # Set dummy env vars so imports don't fail
           GOOGLE_CLOUD_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
           GOOGLE_CLOUD_REGION: us-central1
           CHROMA_DB_DIR: /tmp/chroma
 
-  # ── Job 2: Build & Deploy ──────────────────────────────────────────────
+  # ── Job 2: Build & Deploy (only on push to main) ─────────────────────────
   deploy:
     name: Build and Deploy
-    needs: test
+    needs: test                         # Only runs if tests pass
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' # Not on PRs
 
     steps:
       - name: Checkout code
@@ -60,36 +62,28 @@ jobs:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
           export_default_credentials: true
 
+      - name: Debug auth
+        run: |
+          gcloud auth list
+          gcloud config list
+    
+
       - name: Set up gcloud CLI
         uses: google-github-actions/setup-gcloud@v2
-        with:
-          project_id: ${{ env.PROJECT_ID }}
 
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
 
-      - name: Build and push image via Cloud Build (async + wait)
+      - name: Build and push image via Cloud Build
         run: |
-          IMAGE_URI=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:${{ github.sha }}
-
-          echo "Building image: $IMAGE_URI"
-
-          BUILD_ID=$(gcloud builds submit \
-            --async \
-            --format='value(metadata.build.id)' \
-            --tag "$IMAGE_URI" \
-            --project ${{ env.PROJECT_ID }})
-
-          echo "Started build: $BUILD_ID"
-
-          gcloud builds wait "$BUILD_ID" --project ${{ env.PROJECT_ID }}
+          gcloud builds submit \
+            --tag ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:${{ github.sha }} \
+            --project ${{ env.PROJECT_ID }}
 
       - name: Deploy to Cloud Run
         run: |
-          IMAGE_URI=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:${{ github.sha }}
-
           gcloud run deploy ${{ env.SERVICE }} \
-            --image "$IMAGE_URI" \
+            --image ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:${{ github.sha }} \
             --platform managed \
             --region ${{ env.REGION }} \
             --allow-unauthenticated \
