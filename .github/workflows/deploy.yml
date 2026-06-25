@@ -1,0 +1,94 @@
+name: Build and Deploy to Cloud Run
+
+on:
+  push:
+    branches:
+      - main          # Auto-deploy on push to main
+  pull_request:
+    branches:
+      - main          # Run build+test on PRs (no deploy)
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  REGION: us-central1
+  REPO: ai-repo
+  IMAGE: ai-app
+  SERVICE: ai-app
+
+jobs:
+  # ── Job 1: Test ─────────────────────────────────────────────────────────
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run tests
+        run: |
+          # If you have pytest tests:
+          # pytest tests/ -v
+          # For now, at minimum verify the app can be imported:
+          python -c "from main import app; print('App import OK')"
+        env:
+          # Set dummy env vars so imports don't fail
+          GOOGLE_CLOUD_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+          GOOGLE_CLOUD_REGION: us-central1
+          CHROMA_DB_DIR: /tmp/chroma
+
+  # ── Job 2: Build & Deploy (only on push to main) ─────────────────────────
+  deploy:
+    name: Build and Deploy
+    needs: test                         # Only runs if tests pass
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' # Not on PRs
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Build and push image via Cloud Build
+        run: |
+          gcloud builds submit \
+            --tag ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:${{ github.sha }} \
+            --project ${{ env.PROJECT_ID }}
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ${{ env.SERVICE }} \
+            --image ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO }}/${{ env.IMAGE }}:${{ github.sha }} \
+            --platform managed \
+            --region ${{ env.REGION }} \
+            --allow-unauthenticated \
+            --min-instances=0 \
+            --max-instances=2 \
+            --concurrency=1 \
+            --set-env-vars GOOGLE_CLOUD_PROJECT=${{ env.PROJECT_ID }},GOOGLE_CLOUD_REGION=${{ env.REGION }},CHROMA_DB_DIR=/tmp/chroma \
+            --project ${{ env.PROJECT_ID }}
+
+      - name: Print deployed URL
+        run: |
+          URL=$(gcloud run services describe ${{ env.SERVICE }} \
+            --region ${{ env.REGION }} \
+            --format='value(status.url)')
+          echo "✅ Deployed: $URL"
