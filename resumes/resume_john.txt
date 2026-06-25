@@ -1,0 +1,23 @@
+Name: John Smith
+Email: john.smith@email.com
+Years of Experience: 8 years
+
+SKILLS:
+- Python, Java, C#
+- Google Cloud Platform (GCP), Vertex AI
+- Docker, Kubernetes
+- LangChain, LangGraph
+- Machine Learning, NLP
+
+EXPERIENCE:
+Senior Software Engineer - TechCorp (2020-2024)
+- Built and deployed ML pipelines on GCP using Vertex AI
+- Designed RAG systems for enterprise document search
+- Led team of 5 engineers building cloud-native applications
+
+Software Engineer - DataSoft (2018-2020)
+- Developed Python microservices deployed on Kubernetes
+- Implemented NLP models for text classification
+
+EDUCATION:
+Master of Computer Science - University of Toronto 2018

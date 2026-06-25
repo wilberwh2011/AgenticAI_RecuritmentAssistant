@@ -1,0 +1,25 @@
+# Secrets
+.env
+
+# Virtual environment
+.venv/
+
+# Vector database
+chroma_db/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Generated reports
+report_*.txt
+
+# VS Code
+.vscode/
+
+# Windows
+Thumbs.db
+desktop.ini
+
+*.credentials.json

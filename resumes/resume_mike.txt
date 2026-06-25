@@ -1,0 +1,26 @@
+Name: Mike Johnson
+Email: mike.johnson@email.com
+Years of Experience: 12 years
+
+SKILLS:
+- Python, Go, Rust
+- GCP (Certified), AWS, Azure
+- Kubernetes, Docker, Terraform
+- AI/ML: LLMs, Vector Databases, RAG, LangChain
+- System Architecture, Microservices
+
+EXPERIENCE:
+Principal AI Architect - AICompany (2022-2024)
+- Architected multi-agent AI systems using LangGraph
+- Built RAG pipelines processing 1M+ documents daily
+- Led GCP infrastructure design for AI workloads
+- Deployed Gemini models via Vertex AI in production
+
+Senior Cloud Engineer - CloudCorp (2018-2022)
+- Designed cloud-native architectures on GCP
+- Built CI/CD pipelines using Cloud Build
+- Managed Kubernetes clusters serving enterprise clients
+
+EDUCATION:
+Bachelor of Computer Science - McGill University 2012
+GCP Professional Cloud Architect Certificate 2021

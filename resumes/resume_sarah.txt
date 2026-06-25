@@ -1,0 +1,23 @@
+Name: Sarah Chen
+Email: sarah.chen@email.com
+Years of Experience: 5 years
+
+SKILLS:
+- Python, JavaScript
+- AWS, Azure (limited GCP experience)
+- React, Node.js
+- REST API design
+- SQL, PostgreSQL
+
+EXPERIENCE:
+Full Stack Developer - WebAgency (2021-2024)
+- Built web applications using React and Node.js
+- Designed REST APIs serving 100k daily users
+- Some experience with AWS Lambda and S3
+
+Junior Developer - StartupXYZ (2019-2021)
+- Frontend development using JavaScript and React
+- Basic Python scripting for automation
+
+EDUCATION:
+Bachelor of Software Engineering - UBC 2019
