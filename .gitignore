@@ -22,4 +22,7 @@ report_*.txt
 Thumbs.db
 desktop.ini
 
+# Document folder
+Document/
+
 *.credentials.json
