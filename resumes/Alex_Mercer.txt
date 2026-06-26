@@ -1,0 +1,46 @@
+Alex Mercer 
+Senior Software Engineer – Agentic AI & Cloud Native Systems
+Email: alex.mercer@example.com Location: Toronto, ON LinkedIn: linkedin.com/in/alexmercer-ai GitHub: github.com/alexmercer-ai
+PROFILE
+Senior Software Engineer with 12+ years of experience designing and delivering large scale distributed systems, now specializing in agentic AI architectures, LLM driven automation, and cloud native AI platforms. Expert in orchestrating multi agent workflows using frameworks such as LangGraph, CrewAI, and custom Python based agent runtimes. Strong background in full stack engineering, microservices, and high performance backend systems. Passionate about building autonomous AI systems that reason, plan, and execute reliably in enterprise environments.
+CORE COMPETENCIES
+•	Agentic AI Systems: Multi agent orchestration, tool use agents, planning agents, autonomous pipelines
+•	LLM Engineering: Prompt engineering, function calling, structured output, evaluation frameworks
+•	RAG & Search: Vector databases (Pinecone, Chroma, Vertex Matching Engine), retrieval optimization, hybrid search
+•	Cloud Platforms: GCP (Vertex AI, Cloud Run, Pub/Sub), AWS (SageMaker, Lambda), Azure OpenAI
+•	Backend Engineering: Python, Go, C#, Node.js, microservices, distributed systems
+•	DevOps & MLOps: Docker, Kubernetes, CI/CD, feature stores, model deployment
+•	Data Engineering: ETL pipelines, streaming systems, schema design, data governance
+PROFESSIONAL EXPERIENCE
+Senior Software Engineer – AI Systems
+NovaAI Technologies, Toronto, ON 2021 – Present
+•	Designed and implemented a multi agent orchestration platform enabling autonomous research, summarization, and decision support workflows for enterprise clients.
+•	Built a RAG pipeline using Vertex AI embeddings + Pinecone, reducing hallucinations by 42% and improving retrieval precision.
+•	Developed a task planning agent capable of decomposing complex business workflows into executable subtasks using LLM based reasoning.
+•	Integrated tool use capabilities enabling agents to call APIs, query databases, and trigger cloud functions.
+•	Led migration of legacy ML services to containerized, serverless GCP architecture, improving scalability and reducing costs by 28%.
+•	Mentored a team of 5 engineers on LLM engineering, prompt design, and agentic system patterns.
+Software Engineer – Cloud & Distributed Systems
+BlueWave Digital, Vancouver, BC 2016 – 2021
+•	Built high throughput backend services in Go and Python supporting millions of daily transactions.
+•	Designed microservices architecture with event driven patterns using Kafka and gRPC.
+•	Implemented automated CI/CD pipelines and containerized deployments on Kubernetes.
+•	Collaborated with data science teams to integrate ML inference endpoints into production systems.
+Software Developer
+NorthPeak Solutions, Calgary, AB 2013 – 2016
+•	Developed full stack web applications using C#, .NET, and React.
+•	Built internal APIs and authentication systems for enterprise clients.
+•	Improved system reliability by implementing monitoring, logging, and automated testing frameworks.
+PROJECT HIGHLIGHTS
+•	Autonomous Research Agent Built a multi agent system that autonomously gathers data, evaluates sources, and produces structured reports for financial analysts.
+•	AI Driven Customer Support Assistant Designed an agentic workflow combining retrieval, reasoning, and tool use to automate 60% of Tier 1 support tasks.
+•	Enterprise RAG Platform Created a modular RAG architecture with pluggable retrievers, ranking models, and evaluation metrics.
+EDUCATION
+B.Sc. Computer Science University of British Columbia
+CERTIFICATIONS
+•	Google Cloud Professional Cloud Developer
+•	AWS Certified Solutions Architect – Associate
+•	DeepLearning.AI: LLMs & LangChain Specialization
+TECH STACK
+Languages: Python, Go, C#, JavaScript/TypeScript AI/ML: LangGraph, LangChain, CrewAI, HuggingFace, Vertex AI, OpenAI APIs Databases: PostgreSQL, Redis, MongoDB, Pinecone, Chroma Cloud: GCP, AWS, Azure Tools: Docker, Kubernetes, Terraform, GitHub Actions
+
