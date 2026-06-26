@@ -169,6 +169,11 @@ Respond in EXACTLY this format for each candidate, no deviation:
 def summarizer_agent(state: RecruitState) -> RecruitState:
     print("\n🤖 Agent 3 — Summarizer running...")
 
+    # ✅ ADD THIS GUARD
+    if not state["evaluated_candidates"]:
+        print("⚠️ No evaluated candidates — skipping report")
+        return {**state, "final_report": "No candidates found matching the criteria. The database may be empty."}
+
     candidates_text = ""
     for i, c in enumerate(state["evaluated_candidates"]):
         candidates_text += f"""
