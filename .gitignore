@@ -5,7 +5,7 @@
 .venv/
 
 # Vector database
-chroma_db/
+# chroma_db/
 
 # Python cache
 __pycache__/
