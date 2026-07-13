@@ -5,11 +5,10 @@ from dotenv import load_dotenv
 from pathlib import Path
 from fastapi import FastAPI
 from pydantic import BaseModel
-
-load_dotenv()
-
 from rag_engine import build_vector_store, load_vector_store
 from agent_graph import build_graph, RecruitState
+
+load_dotenv()
 
 # ---------------------------------------------------------
 # FASTAPI SETUP (for Cloud Run)

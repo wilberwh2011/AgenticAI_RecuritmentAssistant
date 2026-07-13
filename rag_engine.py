@@ -1,24 +1,24 @@
 import os
 import shutil
 from pathlib import Path
+
 from dotenv import load_dotenv
+from langchain_chroma import Chroma
+from langchain_community.document_loaders import TextLoader
+from langchain_google_vertexai import VertexAIEmbeddings
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 load_dotenv()
 
 project = os.getenv("GOOGLE_CLOUD_PROJECT")
 region = os.getenv("GOOGLE_CLOUD_REGION")
 
-from langchain_google_vertexai import VertexAIEmbeddings
-from langchain_chroma import Chroma
-from langchain_community.document_loaders import TextLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-
 
 def build_vector_store(resume_folder: str = "./resumes", force_rebuild: bool = True):
     print("📄 Loading resumes...")
     docs = []
 
-    from langchain_community.document_loaders import TextLoader, PyPDFLoader
+    from langchain_community.document_loaders import PyPDFLoader
 
     file_count = 0
 
@@ -46,10 +46,7 @@ def build_vector_store(resume_folder: str = "./resumes", force_rebuild: bool = T
 
     print(f"✅ Loaded {file_count} file(s) → {len(docs)} document chunk(s)")
 
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=800,
-        chunk_overlap=0
-    )
+    splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=0)
     chunks = splitter.split_documents(docs)
     print(f"✅ Split into {len(chunks)} chunks")
 
@@ -61,16 +58,14 @@ def build_vector_store(resume_folder: str = "./resumes", force_rebuild: bool = T
 
     print("🔢 Generating embeddings with Vertex AI...")
     embeddings = VertexAIEmbeddings(
-        model_name="text-embedding-004",
+        model_name="text-embedding-004", # type: ignore
         project=project,
         location=region,
     )
 
     print("💾 Storing in vector database...")
     vectorstore = Chroma.from_documents(
-        chunks,
-        embeddings,
-        persist_directory="./chroma_db"
+        chunks, embeddings, persist_directory="./chroma_db"
     )
 
     print("✅ Vector store built successfully!")
@@ -81,14 +76,11 @@ def load_vector_store():
     """Load existing vector store without rebuilding."""
     print("📂 Loading existing vector store...")
     embeddings = VertexAIEmbeddings(
-        model_name="text-embedding-004",
+        model_name="text-embedding-004", # type: ignore
         project=project,
         location=region,
     )
-    vectorstore = Chroma(
-        persist_directory="./chroma_db",
-        embedding_function=embeddings
-    )
+    vectorstore = Chroma(persist_directory="./chroma_db", embedding_function=embeddings)
     print("✅ Vector store loaded!")
     return vectorstore
 
@@ -109,7 +101,7 @@ def search_candidates(query: str, vectorstore, k: int = 6):
     print(f"✅ Found {len(unique_results)} unique candidate(s)\n")
     for i, doc in enumerate(unique_results):
         filename = Path(doc.metadata.get("source", "unknown")).name
-        print(f"--- Candidate {i+1}: {filename} ---")
+        print(f"--- Candidate {i + 1}: {filename} ---")
         print(doc.page_content)
         print()
 
