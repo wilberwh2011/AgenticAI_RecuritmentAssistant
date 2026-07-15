@@ -18,7 +18,11 @@ def search_resumes(query: str, k: int = 6) -> List[Dict]:
     vectorstore = load_vector_store()
     results = search_candidates(query, vectorstore, k=k)
     return [
-        {"source": doc.metadata.get("source", "unknown"), "content": doc.page_content}
+        {
+            "source": doc.metadata.get("source", "unknown"),
+            "github_username": doc.metadata.get("github_username", "unknown"),
+            "content": doc.page_content,
+        }
         for doc in results
     ]
 
@@ -57,6 +61,7 @@ def evaluate_candidates_batch(
         if c.get("github_data"):
             gd = c["github_data"]
             github_note = f"\nGitHub activity: {gd['public_repos']} public repos, languages: {gd.get('top_languages')}"
+            print(f"  🔗 Found GitHub data for {c['source']}: {github_note}")
         all_candidates_text += f"""
 CANDIDATE {i + 1}: {c["source"]}
 {c["content"]}{github_note}
@@ -80,6 +85,10 @@ JOB DESCRIPTION:
 
 CANDIDATES TO EVALUATE:
 {all_candidates_text}
+When a candidate has GitHub activity listed, treat matching languages/technologies
+as corroborating evidence of the skill (not a resume claim alone) and note this
+explicitly in their strengths. Absence of GitHub data should NOT be held against
+a candidate — many strong candidates don't have public repos.
 
 Respond ONLY as a JSON array, one object per candidate, in the same order given, no other text:
 [{{"score": <1-10>, "meets_requirements": <true|false>, "strengths": ["...", "..."], "gaps": ["..."], "summary": "..."}}]
@@ -126,13 +135,17 @@ def send_shortlist_email(shortlist_report: str, recipient: str) -> str:
     msg["From"] = os.environ["DEMO_EMAIL_SENDER"]
     msg["To"] = recipient
     with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-        server.login(os.environ["DEMO_EMAIL_SENDER"], os.environ["DEMO_EMAIL_APP_PASSWORD"])
+        server.login(
+            os.environ["DEMO_EMAIL_SENDER"], os.environ["DEMO_EMAIL_APP_PASSWORD"]
+        )
         server.send_message(msg)
-    return f"Email sent to {recipient}"
+    return f"Email has been sent to {recipient}"
+
 
 @tool
 def display_report_on_screen(shortlist_report: str) -> str:
     """Display the shortlist report directly in the terminal/UI instead of emailing it."""
+    print("\n💾 Here is the Short List Report ------")
     print("\n" + "=" * 60)
     print(shortlist_report)
     print("=" * 60)

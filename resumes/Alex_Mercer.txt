@@ -1,6 +1,8 @@
 Alex Mercer 
 Senior Software Engineer – Agentic AI & Cloud Native Systems
-Email: alex.mercer@example.com Location: Toronto, ON LinkedIn: linkedin.com/in/alexmercer-ai GitHub: github.com/alexmercer-ai
+Email: alex.mercer@example.com Location: Toronto, ON LinkedIn: linkedin.com/in/alexmercer-ai 
+GitHub: https://github.com/wilberwh2011
+
 PROFILE
 Senior Software Engineer with 12+ years of experience designing and delivering large scale distributed systems, now specializing in agentic AI architectures, LLM driven automation, and cloud native AI platforms. Expert in orchestrating multi agent workflows using frameworks such as LangGraph, CrewAI, and custom Python based agent runtimes. Strong background in full stack engineering, microservices, and high performance backend systems. Passionate about building autonomous AI systems that reason, plan, and execute reliably in enterprise environments.
 CORE COMPETENCIES

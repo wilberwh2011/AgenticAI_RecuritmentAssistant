@@ -1,12 +1,14 @@
 import os
 import sys
 from datetime import date
-from dotenv import load_dotenv
 from pathlib import Path
+
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from pydantic import BaseModel
+
+from agent_graph import RecruitState, build_graph
 from rag_engine import build_vector_store, load_vector_store
-from agent_graph import build_graph, RecruitState
 
 load_dotenv()
 
@@ -16,16 +18,20 @@ load_dotenv()
 
 app = FastAPI(title="AI Recruitment Assistant")
 
+
 class PipelineRequest(BaseModel):
     job_description: str
     query: str
 
+
 class SearchRequest(BaseModel):
     query: str
+
 
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
 
 @app.post("/run")
 def run_pipeline_api(payload: PipelineRequest):
@@ -44,7 +50,8 @@ def run_pipeline_api(payload: PipelineRequest):
         query=payload.query,
         retrieved_candidates=[],
         evaluated_candidates=[],
-        final_report=""
+        final_report="",
+        delivery_status="",
     )
 
     result = graph.invoke(initial_state)
@@ -62,6 +69,7 @@ def search_api(payload: SearchRequest):
     """
     vs = load_vector_store()
     from rag_engine import search_candidates
+
     results = search_candidates(payload.query, vs)
     return {"results": results}
 
@@ -69,6 +77,7 @@ def search_api(payload: SearchRequest):
 # ---------------------------------------------------------
 # ORIGINAL CLI MODE (unchanged)
 # ---------------------------------------------------------
+
 
 def print_banner():
     print("""
@@ -118,11 +127,13 @@ def run_pipeline(job_description: str, query: str):
         query=query,
         retrieved_candidates=[],
         evaluated_candidates=[],
-        final_report=""
+        final_report="",
+        delivery_status="",
     )
 
     result = graph.invoke(initial_state)
 
+    print("\n💾 The main process is Saing the following Report to a file")
     print("\n" + "=" * 60)
     print("📋 FINAL RECRUITMENT REPORT")
     print(f"📅 Generated: {date.today().strftime('%B %d, %Y')}")
@@ -131,7 +142,7 @@ def run_pipeline(job_description: str, query: str):
 
     report_path = os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
-        f"report_{date.today().strftime('%Y%m%d_%H%M%S')}.txt"
+        f"report_{date.today().strftime('%Y%m%d_%H%M%S')}.txt",
     )
     with open(report_path, "w", encoding="utf-8") as f:
         f.write(f"RECRUITMENT REPORT — {date.today().strftime('%B %d, %Y')}\n")
@@ -146,6 +157,7 @@ def run_pipeline(job_description: str, query: str):
 
 def search_only(query: str):
     from rag_engine import search_candidates
+
     print("\n🔍 Running search only — no evaluation...")
     vs = load_vector_store()
     search_candidates(query, vs)

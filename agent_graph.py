@@ -8,6 +8,7 @@ from langgraph.graph import END, StateGraph
 
 from tools import (
     check_github_profile,
+    display_report_on_screen,
     evaluate_candidates_batch,
     search_resumes,
     send_shortlist_email,
@@ -268,7 +269,7 @@ Write a clear, professional shortlist report including:
     response = llm_report.invoke(prompt)
 
     print("✅ Summarizer complete")
-    return {**state, "final_report": response.content}
+    return {**state, "final_report": response.content}  # type: ignore
 
 
 # ─────────────────────────────────────────────
@@ -317,6 +318,7 @@ def delivery_agent(state: RecruitState) -> RecruitState:
                     {"shortlist_report": state["final_report"]}
                 )
             else:
+                print("\n💾 Sending a report to email .....")
                 args["recipient"] = match.group(0)
                 delivery_status = send_shortlist_email.invoke(args)
         else:
@@ -336,12 +338,14 @@ def build_graph():
     graph.add_node("retriever", retriever_agent)
     graph.add_node("evaluator", evaluator_agent)
     graph.add_node("summarizer", summarizer_agent)
+    graph.add_node("deliver", delivery_agent)
 
     # Wire the flow
     graph.set_entry_point("retriever")
     graph.add_edge("retriever", "evaluator")
     graph.add_edge("evaluator", "summarizer")
-    graph.add_edge("summarizer", END)
+    graph.add_edge("summarizer", "deliver")
+    graph.add_edge("deliver", END)
 
     return graph.compile()
 
@@ -371,6 +375,7 @@ if __name__ == "__main__":
         retrieved_candidates=[],
         evaluated_candidates=[],
         final_report="",
+        delivery_status="",
     )
 
     print("🚀 Starting Multi-Agent Recruitment Pipeline...")

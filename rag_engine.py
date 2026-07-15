@@ -27,8 +27,15 @@ def build_vector_store(resume_folder: str = "./resumes", force_rebuild: bool = T
             print(f"  Loading TXT: {file.name}")
             loader = TextLoader(str(file), encoding="utf-8")
             loaded = loader.load()
+
+            # Extract once from the full file text, then apply to every doc/chunk
+            full_text = "\n".join(doc.page_content for doc in loaded)
+            github_username = extract_github_username(full_text)
+
             for doc in loaded:
                 doc.metadata["source"] = file.name
+                doc.metadata["github_username"] = github_username
+
             docs.extend(loaded)
             file_count += 1
 
@@ -36,8 +43,15 @@ def build_vector_store(resume_folder: str = "./resumes", force_rebuild: bool = T
             print(f"  Loading PDF: {file.name}")
             loader = PyPDFLoader(str(file))
             loaded = loader.load()
+
+            # Extract once from the full file text, then apply to every doc/chunk
+            full_text = "\n".join(doc.page_content for doc in loaded)
+            github_username = extract_github_username(full_text)
+
             for doc in loaded:
                 doc.metadata["source"] = file.name
+                doc.metadata["github_username"] = github_username
+
             docs.extend(loaded)
             file_count += 1
 
@@ -58,7 +72,7 @@ def build_vector_store(resume_folder: str = "./resumes", force_rebuild: bool = T
 
     print("🔢 Generating embeddings with Vertex AI...")
     embeddings = VertexAIEmbeddings(
-        model_name="text-embedding-004", # type: ignore
+        model_name="text-embedding-004",  # type: ignore
         project=project,
         location=region,
     )
@@ -76,7 +90,7 @@ def load_vector_store():
     """Load existing vector store without rebuilding."""
     print("📂 Loading existing vector store...")
     embeddings = VertexAIEmbeddings(
-        model_name="text-embedding-004", # type: ignore
+        model_name="text-embedding-004",  # type: ignore
         project=project,
         location=region,
     )
@@ -106,6 +120,15 @@ def search_candidates(query: str, vectorstore, k: int = 6):
         print()
 
     return unique_results
+
+
+import re
+from typing import Optional
+
+
+def extract_github_username(resume_text: str) -> Optional[str]:
+    match = re.search(r"github\.com/([\w-]+)", resume_text)
+    return match.group(1) if match else None
 
 
 if __name__ == "__main__":
