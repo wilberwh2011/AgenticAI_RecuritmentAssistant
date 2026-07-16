@@ -12,7 +12,7 @@ mcp_client = MultiServerMCPClient(
             "transport": "stdio",
             "command": "npx",
             "args": ["-y", "@modelcontextprotocol/server-github"],
-            "env": {"GITHUB_PERSONAL_ACCESS_TOKEN": os.environ["GITHUB_PAT"]},
+            "env": {"GITHUB_PERSONAL_ACCESS_TOKEN": os.environ["GITHHUB_PAT"]},
         },
     }
 )
