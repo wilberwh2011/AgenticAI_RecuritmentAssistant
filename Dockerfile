@@ -3,9 +3,10 @@ FROM python:3.13-slim
 WORKDIR /app
 
 # Install system deps (needed by some Python packages)
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y curl \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*    
 
 # Install Python dependencies first (layer caching)
 COPY requirements.txt .

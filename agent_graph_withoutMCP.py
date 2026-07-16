@@ -1,5 +1,3 @@
-import asyncio
-import json
 import os
 from datetime import date
 from typing import List, Optional, TypedDict
@@ -9,9 +7,9 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_google_vertexai import ChatVertexAI
 from langgraph.graph import END, StateGraph
 
-from mcp_client_config import mcp_client
 from skills_loader import load_skill
 from tools import (
+    check_github_profile,
     display_report_on_screen,
     evaluate_candidates_batch,
     search_resumes,
@@ -104,57 +102,26 @@ def retriever_agent(state: RecruitState) -> RecruitState:
 # (loaded inside evaluate_candidates_batch, in tools.py —
 #  this agent's body is unchanged, it only orchestrates)
 # ─────────────────────────────────────────────
+def evaluator_agent(state: RecruitState) -> RecruitState:
+    print("\n🤖 Agent 2 — Evaluator running...")
 
+    candidates = state["retrieved_candidates"]
 
-async def build_agent_tools():
-    return await mcp_client.get_tools()
+    # Deterministic GitHub enrichment — no LLM decision involved
+    enriched = []
+    for c in candidates:
+        github_username = c.get("github_username")  # set by ingestor, Phase A.5
+        github_data = None
+        if github_username:
+            result = check_github_profile.invoke({"github_username": github_username})
+            if "error" not in result:
+                github_data = result
+        enriched.append({**c, "github_data": github_data})
 
+    evaluated = evaluate_candidates_batch(enriched, state["job_description"], llm_eval)
+    evaluated.sort(key=lambda x: x["score"], reverse=True)
 
-def make_evaluator_agent(github_search_repos_tool):
-    """Factory — closes over the GitHub MCP tool fetched once at startup."""
-
-    async def evaluator_agent(state: RecruitState) -> RecruitState:
-        print("\n🤖 Agent 2 — Evaluator running...")
-
-        candidates = state["retrieved_candidates"]
-
-        enriched = []
-        for c in candidates:
-            github_username = c.get("github_username")
-            github_data = None
-            if github_username and github_search_repos_tool:
-                result = await github_search_repos_tool.ainvoke(
-                    {"query": f"user:{github_username}"}
-                )
-
-                data = None
-                if isinstance(result, list) and result:
-                    first_block = result[0]
-                    if isinstance(first_block, dict) and "text" in first_block:
-                        try:
-                            data = json.loads(first_block["text"])
-                        except json.JSONDecodeError:
-                            data = None
-
-                repos = data.get("items", []) if isinstance(data, dict) else []
-                if repos:
-                    github_data = {
-                        "public_repos": data.get("total_count", len(repos)),
-                        "repos": [
-                            {"name": r["name"], "description": r.get("description")}
-                            for r in repos
-                        ],
-                    }
-            enriched.append({**c, "github_data": github_data})
-
-        evaluated = evaluate_candidates_batch(
-            enriched, state["job_description"], llm_eval
-        )
-        evaluated.sort(key=lambda x: x["score"], reverse=True)
-
-        return {**state, "evaluated_candidates": evaluated}
-
-    return evaluator_agent
+    return {**state, "evaluated_candidates": evaluated}
 
 
 # ─────────────────────────────────────────────
@@ -269,28 +236,33 @@ def delivery_agent(state: RecruitState) -> RecruitState:
 # ─────────────────────────────────────────────
 # 7. BUILD THE GRAPH
 # ─────────────────────────────────────────────
-async def build_graph():
-    mcp_tools = await build_agent_tools()
-    github_search_repos_tool = next(
-        (t for t in mcp_tools if t.name == "search_repositories"), None
-    )
-    if github_search_repos_tool is None:
-        print(
-            "⚠️ GitHub search_repositories tool not found — evaluator will skip GitHub enrichment"
-        )
-
+def build_graph():
     graph = StateGraph(RecruitState)
+
+    # Add agent nodes
     graph.add_node("retriever", retriever_agent)
-    graph.add_node("evaluator", make_evaluator_agent(github_search_repos_tool))
+    graph.add_node("evaluator", evaluator_agent)
     graph.add_node("summarizer", summarizer_agent)
     graph.add_node("deliver", delivery_agent)
+
+    # Wire the flow
     graph.set_entry_point("retriever")
     graph.add_edge("retriever", "evaluator")
     graph.add_edge("evaluator", "summarizer")
     graph.add_edge("summarizer", "deliver")
     graph.add_edge("deliver", END)
-    app = graph.compile()
 
+    return graph.compile()
+
+
+# ─────────────────────────────────────────────
+# 7. RUN THE PIPELINE
+# ─────────────────────────────────────────────
+if __name__ == "__main__":
+    # Build the graph
+    app = build_graph()
+
+    # Define the job description
     job_description = """
     We are seeking a Senior AI Architect with:
     - 10+ years of software engineering experience
@@ -301,6 +273,7 @@ async def build_graph():
     - Experience with LangChain or similar AI frameworks
     """
 
+    # Initial state
     initial_state = RecruitState(
         job_description=job_description,
         query="GCP AI architect Python Kubernetes experience",
@@ -313,19 +286,11 @@ async def build_graph():
     print("🚀 Starting Multi-Agent Recruitment Pipeline...")
     print("=" * 60)
 
-    result = await app.ainvoke(
-        initial_state
-    )  # ainvoke, not invoke — evaluator is now async
+    # Run the graph
+    result = app.invoke(initial_state)
 
+    # Print final report
     print("\n" + "=" * 60)
     print("📋 FINAL RECRUITMENT REPORT")
     print("=" * 60)
     print(result["final_report"])
-
-
-# ─────────────────────────────────────────────
-# 7. RUN THE PIPELINE
-# ─────────────────────────────────────────────
-
-if __name__ == "__main__":
-    asyncio.run(build_graph())

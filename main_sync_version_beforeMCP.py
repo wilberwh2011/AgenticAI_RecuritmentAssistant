@@ -1,4 +1,3 @@
-import asyncio
 import os
 import sys
 from datetime import date
@@ -19,23 +18,6 @@ load_dotenv()
 
 app = FastAPI(title="AI Recruitment Assistant")
 
-_compiled_graph = (
-    None  # built once, reused — avoids respawning the GitHub MCP subprocess per request
-)
-
-
-async def get_graph():
-    global _compiled_graph
-    if _compiled_graph is None:
-        _compiled_graph = await build_graph()
-    return _compiled_graph
-
-
-@app.on_event("startup")
-async def startup_event():
-    # Build the graph once when the container starts, not on the first request
-    await get_graph()
-
 
 class PipelineRequest(BaseModel):
     job_description: str
@@ -52,7 +34,7 @@ def health():
 
 
 @app.post("/run")
-async def run_pipeline_api(payload: PipelineRequest):
+def run_pipeline_api(payload: PipelineRequest):
     """
     Cloud Run endpoint:
     POST /run
@@ -61,7 +43,7 @@ async def run_pipeline_api(payload: PipelineRequest):
         "query": "..."
     }
     """
-    graph = await get_graph()
+    graph = build_graph()
 
     initial_state = RecruitState(
         job_description=payload.job_description,
@@ -72,7 +54,7 @@ async def run_pipeline_api(payload: PipelineRequest):
         delivery_status="",
     )
 
-    result = await graph.ainvoke(initial_state)
+    result = graph.invoke(initial_state)
     return result
 
 
@@ -93,7 +75,7 @@ def search_api(payload: SearchRequest):
 
 
 # ---------------------------------------------------------
-# ORIGINAL CLI MODE (unchanged in behavior, now async under the hood)
+# ORIGINAL CLI MODE (unchanged)
 # ---------------------------------------------------------
 
 
@@ -134,8 +116,11 @@ def get_search_query():
     return input("> ").strip()
 
 
-async def _run_pipeline_async(job_description: str, query: str):
-    graph = await get_graph()
+def run_pipeline(job_description: str, query: str):
+    print("\n🚀 Starting Multi-Agent Recruitment Pipeline...")
+    print("=" * 60)
+
+    graph = build_graph()
 
     initial_state = RecruitState(
         job_description=job_description,
@@ -146,14 +131,7 @@ async def _run_pipeline_async(job_description: str, query: str):
         delivery_status="",
     )
 
-    return await graph.ainvoke(initial_state)
-
-
-def run_pipeline(job_description: str, query: str):
-    print("\n🚀 Starting Multi-Agent Recruitment Pipeline...")
-    print("=" * 60)
-
-    result = asyncio.run(_run_pipeline_async(job_description, query))
+    result = graph.invoke(initial_state)
 
     print("\n💾 The main process is Saing the following Report to a file")
     print("\n" + "=" * 60)

@@ -1,17 +1,13 @@
-import asyncio
-import json
 import os
 from datetime import date
 from typing import List, Optional, TypedDict
 
 from dotenv import load_dotenv
-from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_google_vertexai import ChatVertexAI
 from langgraph.graph import END, StateGraph
 
-from mcp_client_config import mcp_client
-from skills_loader import load_skill
 from tools import (
+    check_github_profile,
     display_report_on_screen,
     evaluate_candidates_batch,
     search_resumes,
@@ -65,24 +61,35 @@ llm_report = ChatVertexAI(
 # ─────────────────────────────────────────────
 # 3. AGENT 1 — Retriever
 # Searches vector store for relevant candidates
-# Skill: skills/candidate_search/SKILL.md
 # ─────────────────────────────────────────────
+# def retriever_agent(state: RecruitState) -> RecruitState:
+#     print("\n🤖 Agent 1 — Retriever running...")
+
+#     vectorstore = load_vector_store()
+#     results = search_candidates(state["query"], vectorstore, k=6)
+
+#     candidates = []
+#     for doc in results:
+#         candidates.append(
+#             {
+#                 "source": doc.metadata.get("source", "unknown"),
+#                 "content": doc.page_content,
+#             }
+#         )
+
+#     print(f"✅ Retriever found {len(candidates)} candidate(s)")
+#     return {**state, "retrieved_candidates": candidates}
+
+
 def retriever_agent(state: RecruitState) -> RecruitState:
     print("\n🤖 Agent 1 — Retriever running...")
 
     llm_retriever = llm.bind_tools([search_resumes])  # only the tool this agent needs
 
     response = llm_retriever.invoke(
-        [
-            SystemMessage(content=load_skill("candidate_search")),
-            HumanMessage(
-                content=(
-                    f"Find candidates matching: {state['query']}. "
-                    f"You must call the search_resumes tool with k=6 to do this — "
-                    f"do not answer without calling it."
-                )
-            ),
-        ]
+        f"Find candidates matching: {state['query']}. "
+        f"You must call the search_resumes tool with k=6 to do this — "
+        f"do not answer without calling it."
     )
 
     if not response.tool_calls:
@@ -100,71 +107,130 @@ def retriever_agent(state: RecruitState) -> RecruitState:
 # ─────────────────────────────────────────────
 # 4. AGENT 2 — Evaluator
 # Scores each candidate against job description
-# Skill: skills/candidate_scoring/SKILL.md
-# (loaded inside evaluate_candidates_batch, in tools.py —
-#  this agent's body is unchanged, it only orchestrates)
 # ─────────────────────────────────────────────
+# def evaluator_agent(state: RecruitState) -> RecruitState:
+#     print("\n🤖 Agent 2 — Evaluator running...")
+
+#     # Build all candidates into one prompt for relative scoring
+#     all_candidates_text = ""
+#     for i, candidate in enumerate(state["retrieved_candidates"]):
+#         all_candidates_text += f"""
+# CANDIDATE {i + 1}: {candidate["source"]}
+# {candidate["content"]}
+# {"=" * 40}
+# """
+
+#     # Dynamically build expected format based on actual candidate count
+#     format_template = ""
+#     for i in range(len(state["retrieved_candidates"])):
+#         format_template += f"""
+# ---CANDIDATE_{i + 1}---
+# SCORE: [1-10]
+# MEETS_REQUIREMENTS: [YES or NO]
+# STRENGTHS: [2-3 bullet points]
+# GAPS: [2-3 bullet points or "None identified"]
+# SUMMARY: [one sentence]
+# """
+
+#     prompt = f"""
+# You are a strict senior technical recruiter comparing multiple candidates.
+# Evaluate ALL candidates RELATIVE to each other against the job description.
+# Be consistent — if Candidate A is clearly stronger than B, A must score higher.
+
+# Scoring rubric (apply strictly):
+# - 9-10: Exceeds ALL requirements, extremely rare
+# - 7-8: Meets most requirements, strong candidate
+# - 5-6: Meets some requirements, average candidate
+# - 3-4: Meets few requirements, weak candidate
+# - 1-2: Does not meet requirements
+
+# JOB DESCRIPTION:
+# {state["job_description"]}
+
+# CANDIDATES TO EVALUATE:
+# {all_candidates_text}
+
+# Respond in EXACTLY this format for each candidate, no deviation:
+# {format_template}
+# """
+
+#     response = llm_eval.invoke(prompt)
+#     evaluation_text = response.content
+
+#     # Parse results per candidate dynamically
+#     evaluated = []
+#     for i, candidate in enumerate(state["retrieved_candidates"]):
+#         marker = f"---CANDIDATE_{i + 1}---"
+#         next_marker = f"---CANDIDATE_{i + 2}---"
+
+#         if marker in evaluation_text:
+#             start = evaluation_text.index(marker) + len(marker)
+#             # Check if next marker exists, otherwise go to end
+#             if next_marker in evaluation_text:
+#                 end = evaluation_text.index(next_marker)
+#             else:
+#                 end = len(evaluation_text)
+#             section = evaluation_text[start:end].strip()
+#         else:
+#             section = "Evaluation not found"
+
+#         # Extract score
+#         score = 0
+#         for line in section.split("\n"):
+#             if line.strip().startswith("SCORE:"):
+#                 try:
+#                     score = int(line.replace("SCORE:", "").strip())
+#                 except Exception as e:
+#                     score = 0
+#                     print(
+#                         f"Error parsing score for candidate {candidate['source']}: {e}"
+#                     )
+
+#         evaluated.append(
+#             {
+#                 "source": candidate["source"],
+#                 "content": candidate["content"],
+#                 "evaluation": section,
+#                 "score": score,
+#             }
+#         )
+#         print(f"  ✅ Evaluated {candidate['source']} — Score: {score}/10")
+
+#     # Sort by score descending
+#     evaluated.sort(key=lambda x: x["score"], reverse=True)
+#     return {**state, "evaluated_candidates": evaluated}
 
 
-async def build_agent_tools():
-    return await mcp_client.get_tools()
+def evaluator_agent(state: RecruitState) -> RecruitState:
+    print("\n🤖 Agent 2 — Evaluator running...")
 
+    candidates = state["retrieved_candidates"]
 
-def make_evaluator_agent(github_search_repos_tool):
-    """Factory — closes over the GitHub MCP tool fetched once at startup."""
+    # Deterministic GitHub enrichment — no LLM decision involved
+    enriched = []
+    for c in candidates:
+        github_username = c.get("github_username")  # set by ingestor, Phase A.5
+        github_data = None
+        if github_username:
+            result = check_github_profile.invoke({"github_username": github_username})
+            if "error" not in result:
+                github_data = result
+        enriched.append({**c, "github_data": github_data})
 
-    async def evaluator_agent(state: RecruitState) -> RecruitState:
-        print("\n🤖 Agent 2 — Evaluator running...")
+    evaluated = evaluate_candidates_batch(enriched, state["job_description"], llm_eval)
+    evaluated.sort(key=lambda x: x["score"], reverse=True)
 
-        candidates = state["retrieved_candidates"]
-
-        enriched = []
-        for c in candidates:
-            github_username = c.get("github_username")
-            github_data = None
-            if github_username and github_search_repos_tool:
-                result = await github_search_repos_tool.ainvoke(
-                    {"query": f"user:{github_username}"}
-                )
-
-                data = None
-                if isinstance(result, list) and result:
-                    first_block = result[0]
-                    if isinstance(first_block, dict) and "text" in first_block:
-                        try:
-                            data = json.loads(first_block["text"])
-                        except json.JSONDecodeError:
-                            data = None
-
-                repos = data.get("items", []) if isinstance(data, dict) else []
-                if repos:
-                    github_data = {
-                        "public_repos": data.get("total_count", len(repos)),
-                        "repos": [
-                            {"name": r["name"], "description": r.get("description")}
-                            for r in repos
-                        ],
-                    }
-            enriched.append({**c, "github_data": github_data})
-
-        evaluated = evaluate_candidates_batch(
-            enriched, state["job_description"], llm_eval
-        )
-        evaluated.sort(key=lambda x: x["score"], reverse=True)
-
-        return {**state, "evaluated_candidates": evaluated}
-
-    return evaluator_agent
+    return {**state, "evaluated_candidates": evaluated}
 
 
 # ─────────────────────────────────────────────
 # 5. AGENT 3 — Summarizer
 # Produces final shortlist report
-# Skill: skills/shortlist_reporting/SKILL.md
 # ─────────────────────────────────────────────
 def summarizer_agent(state: RecruitState) -> RecruitState:
     print("\n🤖 Agent 3 — Summarizer running...")
 
+    # ✅ ADD THIS GUARD
     if not state["evaluated_candidates"]:
         print("⚠️ No evaluated candidates — skipping report")
         return {
@@ -182,21 +248,25 @@ Score: {c["score"]}/10
 """
 
     prompt = f"""
+You are a recruitment manager writing a final shortlist report.
 Today's date is {date.today().strftime("%B %d, %Y")}.
+
 
 JOB DESCRIPTION:
 {state["job_description"]}
 
 EVALUATED CANDIDATES:
 {candidates_text}
+
+Write a clear, professional shortlist report including:
+1. EXECUTIVE SUMMARY (2-3 sentences)
+2. RECOMMENDED CANDIDATES (ranked, with reasons)
+3. CANDIDATES TO DECLINE (with brief reason)
+4. SUGGESTED INTERVIEW QUESTIONS for top candidate
 """
 
-    response = llm_report.invoke(
-        [
-            SystemMessage(content=load_skill("shortlist_reporting")),
-            HumanMessage(content=prompt),
-        ]
-    )
+    # response = llm.invoke(prompt)
+    response = llm_report.invoke(prompt)
 
     print("✅ Summarizer complete")
     return {**state, "final_report": response.content}  # type: ignore
@@ -205,7 +275,6 @@ EVALUATED CANDIDATES:
 # ─────────────────────────────────────────────
 # 6. AGENT 4 — Delivery_Agent
 # Deliver the final report
-# Skill: skills/result_delivery/SKILL.md
 # ─────────────────────────────────────────────
 import re
 
@@ -222,17 +291,10 @@ def delivery_agent(state: RecruitState) -> RecruitState:
 
     llm_delivery = llm.bind_tools([send_shortlist_email, display_report_on_screen])
     response = llm_delivery.invoke(
-        [
-            SystemMessage(content=load_skill("result_delivery")),
-            HumanMessage(
-                content=(
-                    f'The user said: "{user_answer}". Based on this, call exactly one tool: '
-                    f"send_shortlist_email if they gave an email address, otherwise "
-                    f"display_report_on_screen. The report to deliver is provided separately, "
-                    f"pass it as the shortlist_report argument. shortlist_report: {state['final_report']}"
-                )
-            ),
-        ]
+        f'The user said: "{user_answer}". Based on this, call exactly one tool: '
+        f"send_shortlist_email if they gave an email address, otherwise "
+        f"display_report_on_screen. The report to deliver is provided separately, "
+        f"pass it as the shortlist_report argument. shortlist_report: {state['final_report']}"
     )
 
     if not response.tool_calls:
@@ -269,28 +331,33 @@ def delivery_agent(state: RecruitState) -> RecruitState:
 # ─────────────────────────────────────────────
 # 7. BUILD THE GRAPH
 # ─────────────────────────────────────────────
-async def build_graph():
-    mcp_tools = await build_agent_tools()
-    github_search_repos_tool = next(
-        (t for t in mcp_tools if t.name == "search_repositories"), None
-    )
-    if github_search_repos_tool is None:
-        print(
-            "⚠️ GitHub search_repositories tool not found — evaluator will skip GitHub enrichment"
-        )
-
+def build_graph():
     graph = StateGraph(RecruitState)
+
+    # Add agent nodes
     graph.add_node("retriever", retriever_agent)
-    graph.add_node("evaluator", make_evaluator_agent(github_search_repos_tool))
+    graph.add_node("evaluator", evaluator_agent)
     graph.add_node("summarizer", summarizer_agent)
     graph.add_node("deliver", delivery_agent)
+
+    # Wire the flow
     graph.set_entry_point("retriever")
     graph.add_edge("retriever", "evaluator")
     graph.add_edge("evaluator", "summarizer")
     graph.add_edge("summarizer", "deliver")
     graph.add_edge("deliver", END)
-    app = graph.compile()
 
+    return graph.compile()
+
+
+# ─────────────────────────────────────────────
+# 7. RUN THE PIPELINE
+# ─────────────────────────────────────────────
+if __name__ == "__main__":
+    # Build the graph
+    app = build_graph()
+
+    # Define the job description
     job_description = """
     We are seeking a Senior AI Architect with:
     - 10+ years of software engineering experience
@@ -301,6 +368,7 @@ async def build_graph():
     - Experience with LangChain or similar AI frameworks
     """
 
+    # Initial state
     initial_state = RecruitState(
         job_description=job_description,
         query="GCP AI architect Python Kubernetes experience",
@@ -313,19 +381,11 @@ async def build_graph():
     print("🚀 Starting Multi-Agent Recruitment Pipeline...")
     print("=" * 60)
 
-    result = await app.ainvoke(
-        initial_state
-    )  # ainvoke, not invoke — evaluator is now async
+    # Run the graph
+    result = app.invoke(initial_state)
 
+    # Print final report
     print("\n" + "=" * 60)
     print("📋 FINAL RECRUITMENT REPORT")
     print("=" * 60)
     print(result["final_report"])
-
-
-# ─────────────────────────────────────────────
-# 7. RUN THE PIPELINE
-# ─────────────────────────────────────────────
-
-if __name__ == "__main__":
-    asyncio.run(build_graph())

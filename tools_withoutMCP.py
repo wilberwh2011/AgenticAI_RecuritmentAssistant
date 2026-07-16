@@ -52,20 +52,19 @@ def check_github_profile(github_username: str) -> Dict:
 def evaluate_candidates_batch(
     candidates: List[Dict], job_description: str, llm_eval
 ) -> List[Dict]:
+    """Score ALL candidates relative to each other in a single call, for
+    scoring consistency. This is deterministic business logic, not an
+    LLM-chosen tool — it always runs, once, for the whole candidate set.
+    Kept as a plain function (not bind_tools) for that reason; still
+    exposable via the MCP server in Phase C as a callable endpoint.
+    """
     all_candidates_text = ""
     for i, c in enumerate(candidates):
         github_note = ""
         if c.get("github_data"):
             gd = c["github_data"]
-            repo_lines = []
-            for repo in gd.get("repos", []):
-                if repo.get("description"):
-                    repo_lines.append(f"{repo['name']} — {repo['description']}")
-                else:
-                    repo_lines.append(repo["name"])
-            github_note = f"\nGitHub activity: {gd['public_repos']} public repos: {'; '.join(repo_lines)}"
+            github_note = f"\nGitHub activity: {gd['public_repos']} public repos, languages: {gd.get('top_languages')}"
             print(f"  🔗 Found GitHub data for {c['source']}: {github_note}")
-
         all_candidates_text += f"""
 CANDIDATE {i + 1}: {c["source"]}
 {c["content"]}{github_note}

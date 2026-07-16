@@ -1,0 +1,11 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-f'
+      - 'Dockerfile.mcp'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/recruitment-mcp-server'
+      - '.'
+images:
+  - 'gcr.io/$PROJECT_ID/recruitment-mcp-server'

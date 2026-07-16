@@ -1,0 +1,14 @@
+FROM python:3.13-slim
+WORKDIR /app
+
+COPY tools.py /app/tools.py
+COPY rag_engine.py /app/rag_engine.py
+COPY skills_loader.py /app/skills_loader.py
+COPY skills /app/skills
+COPY mcp_server/server.py /app/server.py
+
+RUN pip install --no-cache-dir mcp fastmcp langchain langchain-google-vertexai langchain-community chromadb requests
+
+ENV PORT=8080
+EXPOSE 8080
+CMD ["python", "server.py"]
