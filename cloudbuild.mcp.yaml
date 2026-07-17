@@ -9,3 +9,5 @@ steps:
       - '.'
 images:
   - 'gcr.io/$PROJECT_ID/recruitment-mcp-server'
+options:
+  logging: CLOUD_LOGGING_ONLY
