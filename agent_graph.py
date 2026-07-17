@@ -270,6 +270,7 @@ def delivery_agent(state: RecruitState) -> RecruitState:
 # 7. BUILD THE GRAPH
 # ─────────────────────────────────────────────
 async def build_graph():
+    """Builds and returns a compiled graph. Callable from main.py or anywhere else."""
     mcp_tools = await build_agent_tools()
     github_search_repos_tool = next(
         (t for t in mcp_tools if t.name == "search_repositories"), None
@@ -289,7 +290,17 @@ async def build_graph():
     graph.add_edge("evaluator", "summarizer")
     graph.add_edge("summarizer", "deliver")
     graph.add_edge("deliver", END)
-    app = graph.compile()
+
+    return graph.compile()  # ← the fix: actually return it
+
+
+# ─────────────────────────────────────────────
+# 8. STANDALONE TEST — only runs when this file
+# is executed directly (python agent_graph.py),
+# NOT when main.py imports build_graph
+# ─────────────────────────────────────────────
+async def _standalone_test():
+    app = await build_graph()
 
     job_description = """
     We are seeking a Senior AI Architect with:
@@ -313,9 +324,7 @@ async def build_graph():
     print("🚀 Starting Multi-Agent Recruitment Pipeline...")
     print("=" * 60)
 
-    result = await app.ainvoke(
-        initial_state
-    )  # ainvoke, not invoke — evaluator is now async
+    result = await app.ainvoke(initial_state)
 
     print("\n" + "=" * 60)
     print("📋 FINAL RECRUITMENT REPORT")
@@ -323,9 +332,5 @@ async def build_graph():
     print(result["final_report"])
 
 
-# ─────────────────────────────────────────────
-# 7. RUN THE PIPELINE
-# ─────────────────────────────────────────────
-
 if __name__ == "__main__":
-    asyncio.run(build_graph())
+    asyncio.run(_standalone_test())

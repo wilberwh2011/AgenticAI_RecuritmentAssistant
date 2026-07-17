@@ -77,7 +77,7 @@ jobs:
             --min-instances=0 \
             --max-instances=2 \
             --concurrency=1 \
-            --set-env-vars GOOGLE_CLOUD_PROJECT=${{ env.PROJECT_ID }},GOOGLE_CLOUD_REGION=${{ env.REGION }},CHROMA_DB_DIR=/tmp/chroma,GITHHUB_PAT=${{ secrets.GITHHUB_PAT }} \
+            --set-env-vars GOOGLE_CLOUD_PROJECT=${{ env.PROJECT_ID }},GOOGLE_CLOUD_REGION=${{ env.REGION }},CHROMA_DB_DIR=/tmp/chroma,GITHUB_PAT=${{ secrets.GIT_HUB_PAT }} \
             --project ${{ env.PROJECT_ID }}
 
       - name: Print deployed URL
