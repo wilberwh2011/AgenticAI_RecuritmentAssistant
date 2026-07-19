@@ -220,6 +220,31 @@ def delivery_agent(state: RecruitState) -> RecruitState:
         "(e.g. 'show it on screen' or 'email it to jane@company.com'): "
     )
 
+    decision = decide_delivery(user_answer, state["final_report"])
+
+    if decision["fallback_reason"]:
+        print(f"⚠️ Falling back to screen delivery ({decision['fallback_reason']})")
+
+    if decision["tool"] == "send_shortlist_email":
+        print("\n💾 Sending a report to email .....")
+        delivery_status = send_shortlist_email.invoke(decision["args"])
+    else:
+        delivery_status = display_report_on_screen.invoke(decision["args"])
+
+    print(f"📬 {delivery_status}")
+    return {**state, "delivery_status": delivery_status}
+
+
+def decide_delivery(user_answer: str, final_report: str) -> dict:
+    """Pure decision logic: given free-text delivery preference + the report,
+    decide which tool to call and with what args. No I/O, no side effects —
+    this is what the eval harness calls directly with fixture strings.
+
+    Returns: {"tool": "send_shortlist_email" | "display_report_on_screen",
+              "args": {...}, "fallback_reason": Optional[str]}
+    fallback_reason is set whenever we defaulted to screen instead of honoring
+    an apparent email request — useful for eval assertions and for logging.
+    """
     llm_delivery = llm.bind_tools([send_shortlist_email, display_report_on_screen])
     response = llm_delivery.invoke(
         [
@@ -229,41 +254,36 @@ def delivery_agent(state: RecruitState) -> RecruitState:
                     f'The user said: "{user_answer}". Based on this, call exactly one tool: '
                     f"send_shortlist_email if they gave an email address, otherwise "
                     f"display_report_on_screen. The report to deliver is provided separately, "
-                    f"pass it as the shortlist_report argument. shortlist_report: {state['final_report']}"
+                    f"pass it as the shortlist_report argument. shortlist_report: {final_report}"
                 )
             ),
         ]
     )
 
     if not response.tool_calls:
-        print("⚠️ Could not determine delivery preference — defaulting to screen")
-        delivery_status = display_report_on_screen.invoke(
-            {"shortlist_report": state["final_report"]}
-        )
-    else:
-        call = response.tool_calls[0]
-        args = call["args"]
+        return {
+            "tool": "display_report_on_screen",
+            "args": {"shortlist_report": final_report},
+            "fallback_reason": "no_tool_call",
+        }
 
-        if call["name"] == "send_shortlist_email":
-            # Real send — re-validate the address against the raw input rather
-            # than trusting the LLM's extracted argument blindly.
-            match = EMAIL_RE.search(user_answer)
-            if not match:
-                print(
-                    "⚠️ Email requested but no valid address found in input — defaulting to screen"
-                )
-                delivery_status = display_report_on_screen.invoke(
-                    {"shortlist_report": state["final_report"]}
-                )
-            else:
-                print("\n💾 Sending a report to email .....")
-                args["recipient"] = match.group(0)
-                delivery_status = send_shortlist_email.invoke(args)
-        else:
-            delivery_status = display_report_on_screen.invoke(args)
+    call = response.tool_calls[0]
+    args = call["args"]
 
-    print(f"📬 {delivery_status}")
-    return {**state, "delivery_status": delivery_status}
+    if call["name"] == "send_shortlist_email":
+        # Real send — re-validate the address against the raw input rather
+        # than trusting the LLM's extracted argument blindly.
+        match = EMAIL_RE.search(user_answer)
+        if not match:
+            return {
+                "tool": "display_report_on_screen",
+                "args": {"shortlist_report": final_report},
+                "fallback_reason": "email_requested_but_unparseable",
+            }
+        args["recipient"] = match.group(0)
+        return {"tool": "send_shortlist_email", "args": args, "fallback_reason": None}
+
+    return {"tool": "display_report_on_screen", "args": args, "fallback_reason": None}
 
 
 # ─────────────────────────────────────────────
