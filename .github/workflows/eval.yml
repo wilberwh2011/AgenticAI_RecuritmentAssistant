@@ -1,0 +1,84 @@
+name: Eval Suite
+
+on:
+  pull_request:
+    paths:
+      - "agent_graph.py"
+      - "tools.py"
+      - "rag_engine.py"
+      - "skills/**"
+      - "eval/**"
+      - "requirements.txt"
+## uncomment the following lines to enable a scheduled nightly run of the retriever eval job. Adjust the cron schedule as needed.
+#     # Retriever eval only - runs nightly at 06:00 UTC. Adjust as needed.
+#     - cron: "0 6 * * *"
+  workflow_dispatch:
+    # Lets you manually trigger either job from the Actions tab, e.g. right
+    # before a demo, without waiting for a PR or the nightly schedule.
+
+jobs:
+  fast-evals:
+    # Delivery routing, evaluator scoring, summarizer checks - cheap enough
+    # (single LLM calls, no vector store build) to run on every PR that
+    # touches agent code, prompts, or the eval suite itself.
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Run delivery routing eval
+        env:
+          GOOGLE_CLOUD_PROJECT: ${{ vars.GOOGLE_CLOUD_PROJECT }}
+          GOOGLE_CLOUD_REGION: ${{ vars.GOOGLE_CLOUD_REGION }}
+        run: python eval/eval_delivery_routing.py --threshold 0.85
+
+      - name: Run evaluator scoring eval
+        env:
+          GOOGLE_CLOUD_PROJECT: ${{ vars.GOOGLE_CLOUD_PROJECT }}
+          GOOGLE_CLOUD_REGION: ${{ vars.GOOGLE_CLOUD_REGION }}
+        run: python eval/eval_evaluator_scoring.py --threshold 0.85
+
+      - name: Run summarizer checks eval
+        env:
+          GOOGLE_CLOUD_PROJECT: ${{ vars.GOOGLE_CLOUD_PROJECT }}
+          GOOGLE_CLOUD_REGION: ${{ vars.GOOGLE_CLOUD_REGION }}
+        run: python eval/eval_summarizer_checks.py --threshold 0.85
+
+  retriever-eval:
+    # Builds a temp vector store + real embedding calls per query - pricier
+    # and slower than the above, so it runs nightly / on demand rather than
+    # on every PR.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Run retriever relevance eval
+        env:
+          GOOGLE_CLOUD_PROJECT: ${{ vars.GOOGLE_CLOUD_PROJECT }}
+          GOOGLE_CLOUD_REGION: ${{ vars.GOOGLE_CLOUD_REGION }}
+        run: python eval/eval_retriever_relevance.py --threshold 0.85

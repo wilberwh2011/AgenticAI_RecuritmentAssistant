@@ -14,7 +14,11 @@ project = os.getenv("GOOGLE_CLOUD_PROJECT")
 region = os.getenv("GOOGLE_CLOUD_REGION")
 
 
-def build_vector_store(resume_folder: str = "./resumes", force_rebuild: bool = True):
+def build_vector_store(
+    resume_folder: str = "./resumes",
+    persist_directory: str = "./chroma_db",
+    force_rebuild: bool = True,
+):
     print("📄 Loading resumes...")
     docs = []
 
@@ -65,9 +69,9 @@ def build_vector_store(resume_folder: str = "./resumes", force_rebuild: bool = T
     print(f"✅ Split into {len(chunks)} chunks")
 
     # Delete old chroma_db if force_rebuild
-    if force_rebuild and Path("./chroma_db").exists():
-        print("🗑️  Deleting old vector store...")
-        shutil.rmtree("./chroma_db")
+    if force_rebuild and Path(persist_directory).exists():
+        print(f"🗑️  Deleting old vector store at {persist_directory}...")
+        shutil.rmtree(persist_directory)
         print("✅ Old vector store deleted")
 
     print("🔢 Generating embeddings with Vertex AI...")
@@ -79,14 +83,14 @@ def build_vector_store(resume_folder: str = "./resumes", force_rebuild: bool = T
 
     print("💾 Storing in vector database...")
     vectorstore = Chroma.from_documents(
-        chunks, embeddings, persist_directory="./chroma_db"
+        chunks, embeddings, persist_directory=persist_directory
     )
 
     print("✅ Vector store built successfully!")
     return vectorstore
 
 
-def load_vector_store():
+def load_vector_store(persist_directory: str = "./chroma_db"):
     """Load existing vector store without rebuilding."""
     print("📂 Loading existing vector store...")
     embeddings = VertexAIEmbeddings(
@@ -94,7 +98,9 @@ def load_vector_store():
         project=project,
         location=region,
     )
-    vectorstore = Chroma(persist_directory="./chroma_db", embedding_function=embeddings)
+    vectorstore = Chroma(
+        persist_directory=persist_directory, embedding_function=embeddings
+    )
     print("✅ Vector store loaded!")
     return vectorstore
 

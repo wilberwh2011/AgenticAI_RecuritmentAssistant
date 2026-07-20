@@ -1,0 +1,65 @@
+[
+  {
+    "id": "clear_email_request",
+    "description": "Unambiguous email address given",
+    "input": "email it to jane@company.com",
+    "assertion_mode": "strict",
+    "expected_tool": "send_shortlist_email",
+    "expected_recipient": "jane@company.com",
+    "expected_fallback_reason": null
+  },
+  {
+    "id": "clear_screen_request",
+    "description": "Explicit request to view on screen, no email mentioned",
+    "input": "just show it on screen",
+    "assertion_mode": "strict",
+    "expected_tool": "display_report_on_screen",
+    "expected_recipient": null,
+    "expected_fallback_reason": null
+  },
+  {
+    "id": "email_intent_no_tool_call",
+    "description": "Email spelled out in words, no '@' present. Observed to be non-deterministic across runs: the LLM sometimes declines to call any tool (no_tool_call) and sometimes attempts send_shortlist_email which the regex then rejects (email_requested_but_unparseable). Both are correct end behavior (falls back to screen), so either fallback_reason is accepted - what we actually care about is that it never sends and never crashes.",
+    "input": "send to jane at company dot com please",
+    "assertion_mode": "strict",
+    "expected_tool": "display_report_on_screen",
+    "expected_recipient": null,
+    "expected_fallback_reason": ["no_tool_call", "email_requested_but_unparseable"]
+  },
+  {
+    "id": "email_intent_unparseable_address",
+    "description": "Has '@' so reads as a clear email attempt, but missing the TLD so EMAIL_RE won't match. Intended to hit the regex-rejection path specifically, but per email_intent_no_tool_call's observed flakiness, LLM tool-call attempts near this boundary aren't fully stable across runs - so we accept either safe fallback reason here too rather than assume determinism we haven't verified.",
+    "input": "email it to jane@company",
+    "assertion_mode": "strict",
+    "expected_tool": "display_report_on_screen",
+    "expected_recipient": null,
+    "expected_fallback_reason": ["no_tool_call", "email_requested_but_unparseable"]
+  },
+  {
+    "id": "email_embedded_in_sentence",
+    "description": "Address is present but surrounded by extra text - regex must extract exactly the address, not something the LLM paraphrases",
+    "input": "could you email the shortlist to jane@company.com, thanks so much!",
+    "assertion_mode": "strict",
+    "expected_tool": "send_shortlist_email",
+    "expected_recipient": "jane@company.com",
+    "expected_fallback_reason": null
+  },
+  {
+    "id": "no_preference_stated",
+    "description": "Vague/ambiguous input with no clear signal either way - LLM behavior here is not fully deterministic, so we log the actual result for review instead of hard-failing the build on it",
+    "input": "whatever's easiest for you",
+    "assertion_mode": "observe",
+    "expected_tool": null,
+    "expected_recipient": null,
+    "expected_fallback_reason": null
+  },
+  {
+    "id": "empty_input",
+    "description": "Empty string - edge case, should not crash, expect graceful fallback to screen",
+    "input": "",
+    "assertion_mode": "observe",
+    "expected_tool": "display_report_on_screen",
+    "expected_recipient": null,
+    "expected_fallback_reason": null
+  }
+]

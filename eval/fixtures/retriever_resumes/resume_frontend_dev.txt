@@ -1,0 +1,21 @@
+Casey Morgan
+Frontend Developer
+
+Summary:
+Frontend developer with 2 years of experience building responsive web
+applications using React, HTML, and CSS. Comfortable with modern JavaScript
+tooling and component-based design.
+
+Skills:
+- React, Redux, TypeScript
+- HTML5, CSS3, Sass
+- Figma to code workflows
+- Basic REST API integration
+
+Experience:
+Built and maintained a marketing website and a customer-facing dashboard UI
+for a small e-commerce company. No backend, cloud infrastructure, or AI/ML
+experience.
+
+Education:
+B.A. Design, 2022

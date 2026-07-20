@@ -1,0 +1,58 @@
+[
+  {
+    "id": "obvious_skill_gap_ordering",
+    "description": "One candidate clearly and drastically outqualifies the other for this JD. This is the basic 'did a prompt change break fundamental judgment' canary - not a subtle case.",
+    "assertion_mode": "strict",
+    "job_description": "We are seeking a Senior AI Architect with:\n- 10+ years of software engineering experience\n- Strong Python programming skills\n- Google Cloud Platform (GCP) expertise\n- Experience with AI/ML, LLMs, and RAG systems\n- Knowledge of Kubernetes, Docker, and microservices\n- Experience with LangChain or similar AI frameworks",
+    "candidates": [
+      {
+        "source": "candidate_strong.txt",
+        "content": "Senior Software Architect with 12 years of experience. Deep expertise in Python, Google Cloud Platform (GCP), Kubernetes, and Docker. Built multiple production RAG systems using LangChain and Vertex AI. Led microservices architecture for a fintech platform serving millions of users.",
+        "github_data": null
+      },
+      {
+        "source": "candidate_weak.txt",
+        "content": "Junior Frontend Developer with 1 year of experience. Skilled in HTML, CSS, and React. Built a portfolio website and a to-do list app during a bootcamp. No backend, cloud, or AI/ML experience listed.",
+        "github_data": null
+      }
+    ],
+    "stronger_source": "candidate_strong.txt",
+    "weaker_source": "candidate_weak.txt"
+  },
+  {
+    "id": "github_enrichment_present",
+    "description": "One candidate has GitHub activity corroborating claimed skills, the other has none. Not asserting a strict score ordering here since GitHub is meant to be corroborating evidence rather than a hard requirement (absence shouldn't be penalized per the prompt's own instructions) - we log scores for manual review instead of hard-failing on a specific direction.",
+    "assertion_mode": "observe",
+    "job_description": "We are seeking a Senior AI Architect with:\n- 10+ years of software engineering experience\n- Strong Python programming skills\n- Google Cloud Platform (GCP) expertise\n- Experience with AI/ML, LLMs, and RAG systems\n- Knowledge of Kubernetes, Docker, and microservices\n- Experience with LangChain or similar AI frameworks",
+    "candidates": [
+      {
+        "source": "candidate_with_github.txt",
+        "content": "Senior Software Engineer with 10 years of experience. Python, GCP, Kubernetes. Some exposure to LangChain-based projects.",
+        "github_data": {
+          "public_repos": 14,
+          "repos": [
+            {"name": "rag-pipeline-gcp", "description": "Production RAG pipeline on Vertex AI and LangChain"},
+            {"name": "k8s-microservices-demo", "description": "Kubernetes microservices reference architecture"}
+          ]
+        }
+      },
+      {
+        "source": "candidate_no_github.txt",
+        "content": "Senior Software Engineer with 10 years of experience. Python, GCP, Kubernetes. Some exposure to LangChain-based projects.",
+        "github_data": null
+      }
+    ]
+  },
+  {
+    "id": "batch_of_four_schema_check",
+    "description": "Larger diverse batch, no strict ordering asserted - purpose is to catch schema drift and count truncation (evaluate_candidates_batch zips candidates with results, which silently truncates if the LLM returns fewer JSON objects than candidates went in).",
+    "assertion_mode": "strict_schema_only",
+    "job_description": "We are seeking a Senior AI Architect with:\n- 10+ years of software engineering experience\n- Strong Python programming skills\n- Google Cloud Platform (GCP) expertise\n- Experience with AI/ML, LLMs, and RAG systems\n- Knowledge of Kubernetes, Docker, and microservices\n- Experience with LangChain or similar AI frameworks",
+    "candidates": [
+      {"source": "cand_1.txt", "content": "DevOps Engineer, 5 years, AWS and Terraform focus, no GCP or AI experience.", "github_data": null},
+      {"source": "cand_2.txt", "content": "Data Scientist, 8 years, Python, pandas, scikit-learn, some LLM prompt engineering, no cloud infra experience.", "github_data": null},
+      {"source": "cand_3.txt", "content": "Full-stack Developer, 3 years, Node.js and React, no Python or cloud experience.", "github_data": null},
+      {"source": "cand_4.txt", "content": "Senior ML Engineer, 11 years, GCP, Vertex AI, Kubernetes, built RAG systems with LangChain in production.", "github_data": null}
+    ]
+  }
+]

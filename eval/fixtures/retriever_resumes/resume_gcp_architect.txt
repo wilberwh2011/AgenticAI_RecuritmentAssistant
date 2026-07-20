@@ -1,0 +1,30 @@
+Jordan Lee
+Senior AI Architect
+
+Summary:
+Senior software architect with 11 years of experience designing and shipping
+production systems. Deep expertise in Python and Google Cloud Platform (GCP).
+Extensive hands-on experience with Kubernetes, Docker, and microservices
+architecture at scale, having led the migration of a monolithic platform to
+a fully containerized GCP-based system serving several million users.
+
+AI/ML Experience:
+Designed and built multiple production Retrieval-Augmented Generation (RAG)
+systems using LangChain and Vertex AI, including a document search platform
+that reduced internal support ticket resolution time by 40%. Deep familiarity
+with vector databases, embedding models, and LLM orchestration frameworks.
+Built multi-agent LangGraph pipelines for internal automation tooling.
+
+Cloud & Infrastructure:
+- Google Cloud Platform: Cloud Run, Vertex AI, BigQuery, Cloud Storage, IAM
+- Kubernetes: GKE cluster design, autoscaling, service mesh (Istio)
+- CI/CD: GitHub Actions, Cloud Build, automated deployment pipelines
+- Docker: multi-stage builds, container security hardening
+
+Leadership:
+Led a team of 6 engineers across two major platform rewrites. Mentored
+junior engineers on cloud-native architecture patterns and AI system design.
+Regularly presents at internal tech talks on LLM application architecture.
+
+Education:
+B.S. Computer Science, 2013

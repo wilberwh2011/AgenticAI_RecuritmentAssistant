@@ -1,0 +1,29 @@
+[
+  {
+    "id": "gcp_architect_query_top_match",
+    "description": "A query clearly matching only the GCP architect resume - it should be the top result, and the completely unrelated frontend resume should not appear in a small top-k.",
+    "query": "GCP AI architect Python Kubernetes RAG LangChain experience",
+    "k": 2,
+    "assertion_mode": "strict",
+    "expect_top_source": "resume_gcp_architect.txt",
+    "expect_excluded_sources": ["resume_frontend_dev.txt"]
+  },
+  {
+    "id": "frontend_query_top_match",
+    "description": "A query clearly matching only the frontend resume - it should be the top result. NOT asserting exclusion of the GCP resume here: it's split into 2 chunks (deliberately, for the dedup test below), which gives it 2 chances to land in a small raw top-k versus 1 chance for single-chunk resumes - a real characteristic of chunk-then-dedup retrieval, not a bug in this fixture. Worth knowing this could skew production ranking toward longer/more-chunked resumes too, independent of actual relevance.",
+    "query": "React frontend developer HTML CSS",
+    "k": 2,
+    "assertion_mode": "strict",
+    "expect_top_source": "resume_frontend_dev.txt",
+    "expect_excluded_sources": []
+  },
+  {
+    "id": "aws_vs_gcp_distinction",
+    "description": "Query specifically asks for GCP - the AWS-only DevOps resume is cloud-adjacent but shouldn't outrank the actual GCP match. Not asserting AWS resume is fully excluded (it's a plausible partial match), just that it doesn't outrank the true match.",
+    "query": "Google Cloud Platform GCP infrastructure experience",
+    "k": 3,
+    "assertion_mode": "strict",
+    "expect_top_source": "resume_gcp_architect.txt",
+    "expect_excluded_sources": []
+  }
+]

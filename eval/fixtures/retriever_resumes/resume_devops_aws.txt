@@ -1,0 +1,21 @@
+Riley Chen
+DevOps Engineer
+
+Summary:
+DevOps engineer with 5 years of experience managing cloud infrastructure and
+CI/CD pipelines on AWS. Strong background in infrastructure as code and
+container orchestration.
+
+Skills:
+- AWS: EC2, S3, Lambda, ECS
+- Terraform, Ansible
+- Docker, basic Kubernetes (EKS)
+- Jenkins, GitHub Actions
+
+Experience:
+Managed AWS infrastructure for a mid-size SaaS company, including migrating
+legacy VMs to containerized ECS services. No Google Cloud Platform or AI/ML
+experience.
+
+Education:
+B.S. Information Technology, 2018

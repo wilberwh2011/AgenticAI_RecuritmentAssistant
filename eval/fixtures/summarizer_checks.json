@@ -1,0 +1,42 @@
+[
+  {
+    "id": "no_hallucinated_sources",
+    "description": "Report should only reference candidate filenames actually present in evaluated_candidates. The summarizer's prompt only ever passes c['source'] (filename) and the evaluation dict - never real resume content or names - so any filename-shaped token in the report that isn't one of the two given here would mean the LLM invented a candidate.",
+    "assertion_mode": "strict",
+    "job_description": "We are seeking a Senior AI Architect with GCP, Python, and Kubernetes experience.",
+    "evaluated_candidates": [
+      {
+        "source": "resume_gcp_architect.txt",
+        "content": "irrelevant - summarizer does not see raw content",
+        "score": 9,
+        "evaluation": {
+          "score": 9,
+          "meets_requirements": true,
+          "strengths": ["Deep GCP and Kubernetes expertise", "11 years of experience"],
+          "gaps": [],
+          "summary": "Excellent match for the role."
+        }
+      },
+      {
+        "source": "resume_devops_aws.txt",
+        "content": "irrelevant - summarizer does not see raw content",
+        "score": 4,
+        "evaluation": {
+          "score": 4,
+          "meets_requirements": false,
+          "strengths": ["Strong infrastructure-as-code background"],
+          "gaps": ["No GCP experience", "AWS-focused, not GCP"],
+          "summary": "Adjacent skill set but missing the core GCP requirement."
+        }
+      }
+    ]
+  },
+  {
+    "id": "empty_candidates_fallback",
+    "description": "No candidates found - should return the exact documented fallback string without ever calling the LLM (summarizer_agent short-circuits before the llm_report.invoke call in this branch, so this case costs nothing to run).",
+    "assertion_mode": "strict",
+    "job_description": "We are seeking a Senior AI Architect with GCP, Python, and Kubernetes experience.",
+    "evaluated_candidates": [],
+    "expected_final_report": "No candidates found matching the criteria. The database may be empty."
+  }
+]
