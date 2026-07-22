@@ -1,3 +1,4 @@
+import json
 import os
 import shutil
 from pathlib import Path
@@ -105,27 +106,104 @@ def load_vector_store(persist_directory: str = "./chroma_db"):
     return vectorstore
 
 
+from opentelemetry import trace
+
+tracer = trace.get_tracer("recruitment-assistant.rag")
+
+import time
+
+from opentelemetry import metrics
+
+meter = metrics.get_meter("recruitment-assistant.rag")
+
+retrieval_latency = meter.create_histogram(
+    name="chroma_retrieval_duration",
+    unit="s",
+    description="Time spent on Chroma similarity search",
+)
+retrieval_calls = meter.create_counter(
+    name="chroma_retrieval_calls",
+    description="Number of retrieval calls made",
+)
+retrieval_result_count = meter.create_histogram(
+    name="chroma_retrieval_result_count",
+    description="Number of unique candidates returned per search",
+)
+
+
 def search_candidates(query: str, vectorstore, k: int = 6):
-    print(f"\n🔍 Searching for: '{query}'")
-    results = vectorstore.similarity_search(query, k=k)
+    start = time.perf_counter()  # type: ignore
+    with tracer.start_as_current_span("chroma_retrieval") as span:
+        span.set_attribute(
+            "langfuse.observation.input", json.dumps({"query": query, "k": k})
+        )
 
-    # Deduplicate by filename only (strip folder path)
-    seen = set()
-    unique_results = []
-    for doc in results:
-        source = Path(doc.metadata.get("source", "unknown")).name
-        if source not in seen:
-            seen.add(source)
-            unique_results.append(doc)
+        print(f"\n🔍 Searching for: '{query}'")
+        results = vectorstore.similarity_search(query, k=k)
+        span.set_attribute("raw_result_count", len(results))
 
-    print(f"✅ Found {len(unique_results)} unique candidate(s)\n")
-    for i, doc in enumerate(unique_results):
-        filename = Path(doc.metadata.get("source", "unknown")).name
-        print(f"--- Candidate {i + 1}: {filename} ---")
-        print(doc.page_content)
-        print()
+        # Deduplicate by filename only (strip folder path)
+        seen = set()
+        unique_results = []
+        for doc in results:
+            source = Path(doc.metadata.get("source", "unknown")).name
+            if source not in seen:
+                seen.add(source)
+                unique_results.append(doc)
 
-    return unique_results
+        print(f"✅ Found {len(unique_results)} unique candidate(s)\n")
+        for i, doc in enumerate(unique_results):
+            filename = Path(doc.metadata.get("source", "unknown")).name
+            print(f"--- Candidate {i + 1}: {filename} ---")
+            print(doc.page_content)
+            print()
+
+        span.set_attribute(
+            "langfuse.observation.output",
+            json.dumps(
+                {
+                    "unique_candidate_count": len(unique_results),
+                    "matched_sources": [
+                        Path(d.metadata.get("source", "unknown")).name
+                        for d in unique_results
+                    ],
+                }
+            ),
+        )
+
+        # keep the existing custom attributes too — they're still useful, just not in Input/Output
+        span.set_attribute("raw_result_count", len(results))
+        span.set_attribute("unique_candidate_count", len(unique_results))
+
+        duration = time.perf_counter() - start  # type: ignore
+        retrieval_latency.record(duration, attributes={"k": k})
+        retrieval_calls.add(1)
+        retrieval_result_count.record(len(unique_results))
+
+        return unique_results
+
+
+# def search_candidates(query: str, vectorstore, k: int = 6):
+#     print(f"\n🔍 Searching for: '{query}'")
+#     results = vectorstore.similarity_search(query, k=k)
+
+#     # Deduplicate by filename only (strip folder path)
+#     seen = set()
+#     unique_results = []
+#     for doc in results:
+#         source = Path(doc.metadata.get("source", "unknown")).name
+#         if source not in seen:
+#             seen.add(source)
+#             unique_results.append(doc)
+
+#     print(f"✅ Found {len(unique_results)} unique candidate(s)\n")
+#     for i, doc in enumerate(unique_results):
+#         filename = Path(doc.metadata.get("source", "unknown")).name
+#         print(f"--- Candidate {i + 1}: {filename} ---")
+#         print(doc.page_content)
+#         print()
+
+#     return unique_results
 
 
 import re

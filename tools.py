@@ -7,27 +7,52 @@ from typing import Dict, List
 import requests
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.tools import tool
+from opentelemetry import trace
 
 from skills_loader import load_skill
+
+tracer = trace.get_tracer("recruitment-assistant.tools")
 
 
 @tool
 def search_resumes(query: str, k: int = 6) -> List[Dict]:
-    """Search the resume vector store for candidates matching a query.
-    Returns a list of {source, content} matching the original retriever's schema.
-    """
-    from rag_engine import load_vector_store, search_candidates
+    """Search the resume vector store for candidates matching a query."""
+    with tracer.start_as_current_span("search_resumes_tool") as span:
+        span.set_attribute("query", query)
 
-    vectorstore = load_vector_store()
-    results = search_candidates(query, vectorstore, k=k)
-    return [
-        {
-            "source": doc.metadata.get("source", "unknown"),
-            "github_username": doc.metadata.get("github_username", "unknown"),
-            "content": doc.page_content,
-        }
-        for doc in results
-    ]
+        from rag_engine import load_vector_store, search_candidates
+
+        vectorstore = load_vector_store()
+        results = search_candidates(query, vectorstore, k=k)
+
+        span.set_attribute("result_count", len(results))
+        return [
+            {
+                "source": doc.metadata.get("source", "unknown"),
+                "github_username": doc.metadata.get("github_username", "unknown"),
+                "content": doc.page_content,
+            }
+            for doc in results
+        ]
+
+
+# @tool
+# def search_resumes(query: str, k: int = 6) -> List[Dict]:
+#     """Search the resume vector store for candidates matching a query.
+#     Returns a list of {source, content} matching the original retriever's schema.
+#     """
+#     from rag_engine import load_vector_store, search_candidates
+
+#     vectorstore = load_vector_store()
+#     results = search_candidates(query, vectorstore, k=k)
+#     return [
+#         {
+#             "source": doc.metadata.get("source", "unknown"),
+#             "github_username": doc.metadata.get("github_username", "unknown"),
+#             "content": doc.page_content,
+#         }
+#         for doc in results
+#     ]
 
 
 @tool

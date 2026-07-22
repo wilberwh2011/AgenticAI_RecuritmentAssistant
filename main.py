@@ -1,4 +1,5 @@
 import asyncio
+import atexit
 import os
 import sys
 from datetime import date
@@ -6,12 +7,31 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
+from langfuse import get_client
 from pydantic import BaseModel
 
 from agent_graph import RecruitState, build_graph
+from otel_setup import init_meter, init_tracer, shutdown_meter, shutdown_tracer
 from rag_engine import build_vector_store, load_vector_store
 
 load_dotenv()
+
+from langfuse.langchain import CallbackHandler
+
+langfuse_handler = CallbackHandler()
+
+print(os.getenv("LANGFUSE_PUBLIC_KEY"), os.getenv("LANGFUSE_HOST"))
+
+# intialize OpenTelemetry tracing using general TracerProvider and OTLPSpanExporter,
+# Since Langfuse SDK provider is registered first, this attaches a second span processor to Langfuse's already-registered provider
+# runs once, at import time, for both CLI and FastAPI paths
+init_tracer()
+init_meter()
+atexit.register(shutdown_meter)
+
+from opentelemetry import trace
+
+print("Provider type:", type(trace.get_tracer_provider()))
 
 # ---------------------------------------------------------
 # FASTAPI SETUP (for Cloud Run)
@@ -72,23 +92,47 @@ async def run_pipeline_api(payload: PipelineRequest):
         delivery_status="",
     )
 
-    result = await graph.ainvoke(initial_state)
+    result = await graph.ainvoke(
+        initial_state,
+        config={
+            "callbacks": [langfuse_handler],
+            "run_name": "recruitment-pipeline_api_call",
+            "metadata": {
+                "langfuse_session_id": f"api-{payload.query[:30]}",
+                "langfuse_tags": ["api", "recruitment-assistant"],
+            },
+        },
+    )
+
     return result
 
 
 @app.post("/search")
+# def search_api(payload: SearchRequest):
+#     """
+#     Cloud Run endpoint:
+#     POST /search
+#     {
+#         "query": "..."
+#     }
+#     """
+#     vs = load_vector_store()
+#     from rag_engine import search_candidates
+
+#     results = search_candidates(payload.query, vs)
+#     return {"results": results}
 def search_api(payload: SearchRequest):
-    """
-    Cloud Run endpoint:
-    POST /search
-    {
-        "query": "..."
-    }
-    """
+    langfuse = get_client()
+
     vs = load_vector_store()
     from rag_engine import search_candidates
 
-    results = search_candidates(payload.query, vs)
+    with langfuse.start_as_current_observation(
+        as_type="span",
+        name="search_candidates_direct",
+    ) as span:
+        results = search_candidates(payload.query, vs)
+        span.update(output={"result_count": len(results)})
     return {"results": results}
 
 
@@ -146,7 +190,18 @@ async def _run_pipeline_async(job_description: str, query: str):
         delivery_status="",
     )
 
-    return await graph.ainvoke(initial_state)
+    # return await graph.ainvoke(initial_state)
+    return await graph.ainvoke(
+        initial_state,
+        config={
+            "callbacks": [langfuse_handler],
+            "run_name": "recruitment-pipeline",
+            "metadata": {
+                "langfuse_session_id": f"cli-{query[:30]}",
+                "langfuse_tags": ["cli", "recruitment-assistant"],
+            },
+        },
+    )
 
 
 def run_pipeline(job_description: str, query: str):
@@ -174,6 +229,15 @@ def run_pipeline(job_description: str, query: str):
         f.write(result["final_report"])
 
     print(f"\n💾 Report saved to: {report_path}")
+
+    # get_client().flush() — flushes Langfuse's own LangfuseSpanProcessor (covers the CallbackHandler traces)
+    # shutdown_tracer() → force_flush() — flushes every processor on the provider, including your manually-added one
+    get_client().flush()
+    shutdown_tracer()
+
+    # commented out shutdown_meter() because it was causing issues with the Cloud Monitoring exporter in the FastAPI path. The meter is now flushed at exit via atexit.register(shutdown_meter) instead of here.
+    # shutdown_meter() — flushes every processor on the provider, including your manually-added one (GCP Cloud Monitoring exporter)
+
     return result
 
 
