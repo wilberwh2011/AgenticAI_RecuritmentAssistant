@@ -29,3 +29,5 @@ Document/
 # Postman
 postman/
 .postman/
+
+checkGoogleEnvSettings.py

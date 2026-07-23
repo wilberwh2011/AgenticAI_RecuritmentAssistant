@@ -115,7 +115,7 @@ jobs:
             --image gcr.io/${{ env.PROJECT_ID }}/recruitment-mcp-server \
             --region ${{ env.REGION }} \
             --allow-unauthenticated \
-            --set-env-vars GOOGLE_CLOUD_PROJECT=${{ env.PROJECT_ID }} \
+            --set-env-vars GOOGLE_CLOUD_PROJECT=${{ env.PROJECT_ID }},GITHUB_PAT=${{ secrets.GIT_HUB_PAT }} \
             --project ${{ env.PROJECT_ID }}
 
       - name: Get MCP server URL
