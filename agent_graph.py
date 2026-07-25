@@ -34,6 +34,7 @@ class RecruitState(TypedDict):
     evaluated_candidates: List[dict]
     final_report: str
     delivery_status: Optional[str]
+    runfrom_api: bool
 
 
 # ─────────────────────────────────────────────
@@ -215,12 +216,19 @@ EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
 def delivery_agent(state: RecruitState) -> RecruitState:
     print("\n🤖 Agent 4 — Delivery running...")
 
-    user_answer = input(
-        "\nHow would you like the results? "
-        "(e.g. 'show it on screen' or 'email it to jane@company.com'): "
-    )
-
-    decision = decide_delivery(user_answer, state["final_report"])
+    if state["runfrom_api"]:
+        print("⚠️ Delivery agent is running in API mode — delivery to display on screen only")
+        decision = {
+            "tool": "display_report_on_screen",
+            "args": {"shortlist_report": state["final_report"]},
+            "fallback_reason": None,
+        }
+    else:
+        user_answer = input(
+            "\nHow would you like the results? "
+            "(e.g. 'show it on screen' or 'email it to jane@company.com'): "
+        )
+        decision = decide_delivery(user_answer, state["final_report"])
 
     if decision["fallback_reason"]:
         print(f"⚠️ Falling back to screen delivery ({decision['fallback_reason']})")

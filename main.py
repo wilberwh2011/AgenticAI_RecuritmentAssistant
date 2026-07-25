@@ -70,6 +70,7 @@ async def run_pipeline_api(payload: PipelineRequest):
         evaluated_candidates=[],
         final_report="",
         delivery_status="",
+        runfrom_api=True,  # flag to indicate this is an API run
     )
 
     result = await graph.ainvoke(initial_state)
@@ -144,6 +145,7 @@ async def _run_pipeline_async(job_description: str, query: str):
         evaluated_candidates=[],
         final_report="",
         delivery_status="",
+        runfrom_api=False,  # flag to indicate this is a CLI run
     )
 
     return await graph.ainvoke(initial_state)
