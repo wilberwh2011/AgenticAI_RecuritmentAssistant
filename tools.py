@@ -9,9 +9,11 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.tools import tool
 from opentelemetry import trace
 
+from log_setup import get_logger
 from skills_loader import load_skill
 
 tracer = trace.get_tracer("recruitment-assistant.tools")
+log = get_logger(__name__)
 
 
 @tool
@@ -77,6 +79,7 @@ def check_github_profile(github_username: str) -> Dict:
 def evaluate_candidates_batch(
     candidates: List[Dict], job_description: str, llm_eval
 ) -> List[Dict]:
+    log.info("evaluate_candidates_batch_start", candidate_count=len(candidates))
     all_candidates_text = ""
     for i, c in enumerate(candidates):
         github_note = ""
@@ -134,6 +137,7 @@ Respond ONLY as a JSON array, one object per candidate, in the same order given,
     try:
         results = json.loads(response.content.strip().strip("```json").strip("```"))
     except Exception as e:
+        log.error("evaluator_json_parse_failed", error=str(e))
         print(f"⚠️ Failed to parse evaluator JSON: {e}")
         results = [
             {
@@ -156,6 +160,12 @@ Respond ONLY as a JSON array, one object per candidate, in the same order given,
             }
         )
         print(f"  ✅ Evaluated {c['source']} — Score: {r.get('score', 0)}/10")
+
+    log.info(
+        "evaluate_candidates_batch_complete",
+        candidate_count=len(evaluated),
+        scores=[e["score"] for e in evaluated],
+    )
     return evaluated
 
 
@@ -175,6 +185,7 @@ def send_shortlist_email(shortlist_report: str, recipient: str) -> str:
             os.environ["DEMO_EMAIL_SENDER"], os.environ["DEMO_EMAIL_APP_PASSWORD"]
         )
         server.send_message(msg)
+    log.info("shortlist_email_sent", recipient=recipient)
     return f"Email has been sent to {recipient}"
 
 

@@ -11,10 +11,17 @@ from langfuse import get_client
 from pydantic import BaseModel
 
 from agent_graph import RecruitState, build_graph
+from log_setup import bind_session_id, get_logger, init_logging
 from otel_setup import init_meter, init_tracer, shutdown_meter, shutdown_tracer
 from rag_engine import build_vector_store, load_vector_store
 
 load_dotenv()
+
+# Structured JSON logging → Cloud Logging. Must run before any log.* calls
+# elsewhere in the app (agent_graph.py, tools.py); safe to call again from
+# other entry points since it's idempotent.
+init_logging()
+log = get_logger(__name__)
 
 from langfuse.langchain import CallbackHandler
 
@@ -83,6 +90,12 @@ async def run_pipeline_api(payload: PipelineRequest):
     """
     graph = await get_graph()
 
+    # Same id used as the Langfuse session id below — one value ties a
+    # Cloud Logging query and a Langfuse trace to the same request.
+    session_id = f"api-{payload.query[:30]}"
+    bind_session_id(session_id)
+    log.info("pipeline_start", job_description_len=len(payload.job_description))
+
     initial_state = RecruitState(
         job_description=payload.job_description,
         query=payload.query,
@@ -98,12 +111,13 @@ async def run_pipeline_api(payload: PipelineRequest):
             "callbacks": [langfuse_handler],
             "run_name": "recruitment-pipeline_api_call",
             "metadata": {
-                "langfuse_session_id": f"api-{payload.query[:30]}",
+                "langfuse_session_id": session_id,
                 "langfuse_tags": ["api", "recruitment-assistant"],
             },
         },
     )
 
+    log.info("pipeline_complete")
     return result
 
 
@@ -122,6 +136,7 @@ async def run_pipeline_api(payload: PipelineRequest):
 #     results = search_candidates(payload.query, vs)
 #     return {"results": results}
 def search_api(payload: SearchRequest):
+    bind_session_id(f"search-{payload.query[:30]}")
     langfuse = get_client()
 
     vs = load_vector_store()
@@ -133,6 +148,7 @@ def search_api(payload: SearchRequest):
     ) as span:
         results = search_candidates(payload.query, vs)
         span.update(output={"result_count": len(results)})
+        log.info("search_complete", result_count=len(results))
     return {"results": results}
 
 
@@ -181,6 +197,11 @@ def get_search_query():
 async def _run_pipeline_async(job_description: str, query: str):
     graph = await get_graph()
 
+    # Same id used as the Langfuse session id below.
+    session_id = f"cli-{query[:30]}"
+    bind_session_id(session_id)
+    log.info("pipeline_start", job_description_len=len(job_description))
+
     initial_state = RecruitState(
         job_description=job_description,
         query=query,
@@ -191,17 +212,19 @@ async def _run_pipeline_async(job_description: str, query: str):
     )
 
     # return await graph.ainvoke(initial_state)
-    return await graph.ainvoke(
+    result = await graph.ainvoke(
         initial_state,
         config={
             "callbacks": [langfuse_handler],
             "run_name": "recruitment-pipeline",
             "metadata": {
-                "langfuse_session_id": f"cli-{query[:30]}",
+                "langfuse_session_id": session_id,
                 "langfuse_tags": ["cli", "recruitment-assistant"],
             },
         },
     )
+    log.info("pipeline_complete")
+    return result
 
 
 def run_pipeline(job_description: str, query: str):

@@ -9,6 +9,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_google_vertexai import ChatVertexAI
 from langgraph.graph import END, StateGraph
 
+from log_setup import bind_agent_node, diff_state, get_logger
 from mcp_client_config import mcp_client
 from skills_loader import load_skill
 from tools import (
@@ -22,6 +23,8 @@ load_dotenv()
 
 project = os.getenv("GOOGLE_CLOUD_PROJECT")
 region = os.getenv("GOOGLE_CLOUD_REGION")
+
+log = get_logger(__name__)
 
 
 # ─────────────────────────────────────────────
@@ -68,6 +71,8 @@ llm_report = ChatVertexAI(
 # Skill: skills/candidate_search/SKILL.md
 # ─────────────────────────────────────────────
 def retriever_agent(state: RecruitState) -> RecruitState:
+    bind_agent_node("retriever")
+    log.info("node_enter", query=state["query"])
     print("\n🤖 Agent 1 — Retriever running...")
 
     llm_retriever = llm.bind_tools([search_resumes])  # only the tool this agent needs
@@ -94,7 +99,9 @@ def retriever_agent(state: RecruitState) -> RecruitState:
         candidates = search_resumes.invoke(response.tool_calls[0]["args"])
 
     print(f"✅ Retriever found {len(candidates)} candidate(s)")
-    return {**state, "retrieved_candidates": candidates}
+    new_state = {**state, "retrieved_candidates": candidates}
+    log.info("node_exit", state_diff=diff_state(state, new_state))
+    return new_state
 
 
 # ─────────────────────────────────────────────
@@ -114,6 +121,8 @@ def make_evaluator_agent(github_search_repos_tool):
     """Factory — closes over the GitHub MCP tool fetched once at startup."""
 
     async def evaluator_agent(state: RecruitState) -> RecruitState:
+        bind_agent_node("evaluator")
+        log.info("node_enter", candidate_count=len(state["retrieved_candidates"]))
         print("\n🤖 Agent 2 — Evaluator running...")
 
         candidates = state["retrieved_candidates"]
@@ -152,7 +161,9 @@ def make_evaluator_agent(github_search_repos_tool):
         )
         evaluated.sort(key=lambda x: x["score"], reverse=True)
 
-        return {**state, "evaluated_candidates": evaluated}
+        new_state = {**state, "evaluated_candidates": evaluated}
+        log.info("node_exit", state_diff=diff_state(state, new_state))
+        return new_state
 
     return evaluator_agent
 
@@ -163,14 +174,20 @@ def make_evaluator_agent(github_search_repos_tool):
 # Skill: skills/shortlist_reporting/SKILL.md
 # ─────────────────────────────────────────────
 def summarizer_agent(state: RecruitState) -> RecruitState:
+    bind_agent_node("summarizer")
+    log.info("node_enter", evaluated_count=len(state["evaluated_candidates"]))
     print("\n🤖 Agent 3 — Summarizer running...")
 
     if not state["evaluated_candidates"]:
         print("⚠️ No evaluated candidates — skipping report")
-        return {
+        new_state = {
             **state,
             "final_report": "No candidates found matching the criteria. The database may be empty.",
         }
+        log.info(
+            "node_exit", state_diff=diff_state(state, new_state), reason="no_candidates"
+        )
+        return new_state
 
     candidates_text = ""
     for i, c in enumerate(state["evaluated_candidates"]):
@@ -199,7 +216,9 @@ EVALUATED CANDIDATES:
     )
 
     print("✅ Summarizer complete")
-    return {**state, "final_report": response.content}  # type: ignore
+    new_state = {**state, "final_report": response.content}  # type: ignore
+    log.info("node_exit", state_diff=diff_state(state, new_state))
+    return new_state
 
 
 # ─────────────────────────────────────────────
@@ -213,6 +232,8 @@ EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
 
 
 def delivery_agent(state: RecruitState) -> RecruitState:
+    bind_agent_node("deliver")
+    log.info("node_enter")
     print("\n🤖 Agent 4 — Delivery running...")
 
     user_answer = input(
@@ -221,6 +242,11 @@ def delivery_agent(state: RecruitState) -> RecruitState:
     )
 
     decision = decide_delivery(user_answer, state["final_report"])
+    log.info(
+        "delivery_decision",
+        tool=decision["tool"],
+        fallback_reason=decision["fallback_reason"],
+    )
 
     if decision["fallback_reason"]:
         print(f"⚠️ Falling back to screen delivery ({decision['fallback_reason']})")
@@ -232,7 +258,9 @@ def delivery_agent(state: RecruitState) -> RecruitState:
         delivery_status = display_report_on_screen.invoke(decision["args"])
 
     print(f"📬 {delivery_status}")
-    return {**state, "delivery_status": delivery_status}
+    new_state = {**state, "delivery_status": delivery_status}
+    log.info("node_exit", state_diff=diff_state(state, new_state))
+    return new_state
 
 
 def decide_delivery(user_answer: str, final_report: str) -> dict:
